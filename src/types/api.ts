@@ -14,6 +14,19 @@ export interface UserResponse {
     createdAt: string;
 }
 
+export interface AdminUserResponse extends UserResponse {
+    active: boolean;
+}
+
+export interface AdminUserPageResponse {
+    content: AdminUserResponse[];
+    page: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    last: boolean;
+}
+
 export interface LoginResponse {
     token: string;
     tokenType: string;
@@ -42,6 +55,9 @@ export type SellerStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface SellerResponse {
     id: number;
+    applicantFirstName: string;
+    applicantLastName: string;
+    applicantEmail: string;
     storeName: string;
     phone: string;
     city: string;
@@ -63,4 +79,79 @@ export interface SellerApplicationRequest {
 
 export interface SellerReviewRequest {
     rejectionReason: string;
+}
+
+export type ProductCondition = "NEW" | "USED";
+export type ProductModerationStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface ProductVehicleCompatibility {
+    id?: number;
+    vehicleBrand: string;
+    vehicleModel: string;
+    yearFrom: number;
+    yearTo: number;
+    engineInfo?: string | null;
+}
+
+export interface ProductResponse {
+    id: number;
+    sellerId: number;
+    sellerStoreName: string;
+    sellerFirstName: string;
+    sellerLastName: string;
+    sellerEmail: string;
+    name: string;
+    description: string | null;
+    category: string;
+    brand: string;
+    oemNumber: string | null;
+    price: number;
+    stockQuantity: number;
+    condition: ProductCondition;
+    imageUrl: string | null;
+    vehicleCompatibilities: ProductVehicleCompatibility[];
+    moderationStatus: ProductModerationStatus;
+    rejectionReason: string | null;
+    reviewedAt: string | null;
+    active: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface PublicProductResponse {
+    id: number;
+    sellerStoreName: string;
+    name: string;
+    description: string | null;
+    category: string;
+    brand: string;
+    oemNumber: string | null;
+    price: number;
+    stockQuantity: number;
+    condition: ProductCondition;
+    imageUrl: string | null;
+    vehicleCompatibilities: ProductVehicleCompatibility[];
+    createdAt: string;
+}
+
+export interface ProductPageResponse<T> {
+    content: T[];
+    page: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
+    last: boolean;
+}
+
+export interface ProductRequest {
+    name: string;
+    description?: string;
+    category: string;
+    brand: string;
+    oemNumber?: string;
+    price: number;
+    stockQuantity: number;
+    condition: ProductCondition;
+    imageUrl?: string;
+    vehicleCompatibilities: ProductVehicleCompatibility[];
 }

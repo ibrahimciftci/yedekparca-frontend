@@ -115,6 +115,15 @@ export default function ProfilePage() {
                                 </p>
                             </div>
                         </div>
+
+                        {user.role === "SELLER" && (
+                            <Link
+                                to="/seller/products"
+                                className="inline-flex rounded-lg bg-orange-500 px-5 py-3 font-semibold text-white transition hover:bg-orange-600"
+                            >
+                                Ürünlerimi Yönet
+                            </Link>
+                        )}
                     </div>
                 </div>
             </div>

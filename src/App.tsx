@@ -10,7 +10,7 @@ import {
   LogOut,
 } from "lucide-react";
 
-import { BrowserRouter, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 import LoginPage from "./pages/LoginPage";
@@ -19,9 +19,18 @@ import ProfilePage from "./pages/ProfilePage";
 import AdminRoute from "./components/AdminRoute";
 import AdminLayout from "./layouts/AdminLayout";
 import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminSellerApplicationsPage from "./pages/admin/AdminSellerApplicationsPage";
+import AdminProductsPage from "./pages/admin/AdminProductsPage";
+import ProductCatalogPage from "./pages/ProductCatalogPage";
+import ProductDetailPage from "./pages/ProductDetailPage";
+import SellerProductsPage from "./pages/SellerProductsPage";
+import SellerRoute from "./components/SellerRoute";
 
 // Ana Sayfa
 function HomePage() {
+  const navigate = useNavigate();
+  const [productSearch, setProductSearch] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(
       () => !!localStorage.getItem("token")
   );
@@ -60,9 +69,9 @@ function HomePage() {
                 Ana Sayfa
               </Link>
 
-              <a href="#" className="text-sm text-slate-300 hover:text-white">
+              <Link to="/products" className="text-sm text-slate-300 hover:text-white">
                 Ürünler
-              </a>
+              </Link>
 
               <a href="#" className="text-sm text-slate-300 hover:text-white">
                 Satıcılar
@@ -138,7 +147,7 @@ function HomePage() {
             </div>
 
             {/* Arama Alanı */}
-            <div className="mt-10 max-w-4xl rounded-2xl bg-white p-3 shadow-2xl">
+            <form onSubmit={(event) => { event.preventDefault(); navigate(`/products?search=${encodeURIComponent(productSearch.trim())}`); }} className="mt-10 max-w-4xl rounded-2xl bg-white p-3 shadow-2xl">
               <div className="flex flex-col gap-3 md:flex-row">
 
                 <div className="flex flex-1 items-center gap-3 rounded-xl bg-slate-100 px-4 py-4">
@@ -146,18 +155,20 @@ function HomePage() {
 
                   <input
                       type="text"
+                      value={productSearch}
+                      onChange={(event) => setProductSearch(event.target.value)}
                       placeholder="Ürün adı, OEM numarası veya parça kodu..."
                       className="w-full bg-transparent text-sm text-slate-800 outline-none"
                   />
                 </div>
 
-                <button className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-8 py-4 font-semibold text-white transition hover:bg-orange-600">
+                <button type="submit" className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-8 py-4 font-semibold text-white transition hover:bg-orange-600">
                   <Search size={19} />
                   Parça Ara
                 </button>
 
               </div>
-            </div>
+            </form>
 
             <div className="mt-6 flex flex-wrap gap-6 text-sm text-slate-300">
 
@@ -233,6 +244,10 @@ function HomePage() {
               return (
                   <div
                       key={category.title}
+                      role="link"
+                      tabIndex={0}
+                      onClick={() => navigate(`/products?category=${encodeURIComponent(category.title)}`)}
+                      onKeyDown={(event) => { if (event.key === "Enter") navigate(`/products?category=${encodeURIComponent(category.title)}`); }}
                       className="group rounded-2xl border border-slate-200 bg-white p-7 transition hover:-translate-y-1 hover:border-orange-300 hover:shadow-lg"
                   >
                     <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-xl bg-orange-50 text-orange-500">
@@ -305,6 +320,9 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/products" element={<ProductCatalogPage />} />
+          <Route path="/products/:id" element={<ProductDetailPage />} />
+          <Route path="/seller/products" element={<SellerRoute><SellerProductsPage /></SellerRoute>} />
 
           <Route
               path="/admin"
@@ -315,6 +333,9 @@ function App() {
               }
           >
             <Route index element={<AdminDashboardPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="sellers" element={<AdminSellerApplicationsPage />} />
+            <Route path="products" element={<AdminProductsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
