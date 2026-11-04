@@ -16,6 +16,9 @@ import { useEffect, useState } from "react";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import ProfilePage from "./pages/ProfilePage";
+import AdminRoute from "./components/AdminRoute";
+import AdminLayout from "./layouts/AdminLayout";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
 
 // Ana Sayfa
 function HomePage() {
@@ -302,6 +305,17 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+
+          <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminLayout />
+                </AdminRoute>
+              }
+          >
+            <Route index element={<AdminDashboardPage />} />
+          </Route>
         </Routes>
       </BrowserRouter>
   );

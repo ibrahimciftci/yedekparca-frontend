@@ -24,7 +24,9 @@ function LoginPage() {
 
             localStorage.setItem("token", response.data.token);
 
-            navigate("/");
+            navigate(
+                response.data.user.role === "ADMIN" ? "/admin" : "/"
+            );
         } catch (err: any) {
             setError(
                 err.response?.data?.message ||
