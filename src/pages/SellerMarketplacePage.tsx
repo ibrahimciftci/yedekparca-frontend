@@ -3,6 +3,7 @@ import {Link} from "react-router-dom";
 import {Pencil} from "lucide-react";
 import axios from "axios";
 import marketplaceService, {type OfferView, type CatalogView, type SellerProfile} from "../services/marketplaceService";
+import ProductImage from "../components/ProductImage";
 
 type FormState = {
     catalogProductId: string;
@@ -251,8 +252,8 @@ function SellerMarketplacePage() {
                     <p className="mt-6 rounded-lg bg-slate-50 p-6 text-center text-slate-500">Henüz ürün ilanınız yok. Yeni ürün ekleyerek başlayın.</p> :
                     <div className="mt-5 divide-y">{offers.map(offer => <article key={offer.id} className="flex flex-wrap justify-between gap-4 py-5">
                         <div className="flex gap-4">
-                            <img src={offer.photos.find(photo => photo.primaryPhoto)?.url || offer.photos[0]?.url || offer.legacyImageUrl || "/placeholder-product.svg"}
-                                 alt="" className="h-20 w-20 rounded-lg bg-slate-100 object-cover" />
+                            <ProductImage src={offer.photos.find(photo => photo.primaryPhoto)?.url || offer.photos[0]?.url || offer.legacyImageUrl}
+                                          alt={offer.name} className="h-20 w-20 rounded-lg" />
                             <div><h3 className="font-semibold">{offer.name}</h3>
                                 <p className="mt-1 text-sm text-slate-500">{offer.condition === "NEW" ? "Sıfır" : "İkinci el"} · {offer.price} ₺ · Stok {offer.stockQuantity}</p>
                                 <span className={`mt-2 inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${moderationStyles[offer.moderationStatus]}`}>
