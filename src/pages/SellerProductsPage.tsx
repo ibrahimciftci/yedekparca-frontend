@@ -5,9 +5,11 @@ import ProductImage from "../components/ProductImage";
 import sellerProductService from "../services/sellerProductService";
 import type { ProductModerationStatus, ProductRequest, ProductResponse, ProductVehicleCompatibility } from "../types/api";
 
-const initialForm = (): ProductRequest => ({
-    name: "", description: "", category: "", brand: "", oemNumber: "", price: 0,
-    stockQuantity: 0, condition: "NEW", imageUrl: "", vehicleCompatibilities: [],
+type SellerProductForm = Omit<ProductRequest, "price" | "stockQuantity"> & { price: string; stockQuantity: string };
+
+const initialForm = (): SellerProductForm => ({
+    name: "", description: "", category: "", brand: "", oemNumber: "", price: "",
+    stockQuantity: "0", condition: "NEW", imageUrl: "", vehicleCompatibilities: [],
 });
 
 const statusLabels: Record<ProductModerationStatus, string> = {
@@ -24,7 +26,7 @@ function SellerProductsPage() {
     const [notice, setNotice] = useState("");
     const [editingId, setEditingId] = useState<number | null>(null);
     const [formOpen, setFormOpen] = useState(false);
-    const [form, setForm] = useState<ProductRequest>(initialForm);
+    const [form, setForm] = useState<SellerProductForm>(initialForm);
 
     const loadProducts = useCallback(async () => {
         setLoading(true);
@@ -62,8 +64,8 @@ function SellerProductsPage() {
                 category: product.category,
                 brand: product.brand,
                 oemNumber: product.oemNumber ?? "",
-                price: product.price,
-                stockQuantity: product.stockQuantity,
+                price: String(product.price),
+                stockQuantity: String(product.stockQuantity),
                 condition: product.condition,
                 imageUrl: product.imageUrl ?? "",
                 vehicleCompatibilities: product.vehicleCompatibilities.map(({ vehicleBrand, vehicleModel, yearFrom, yearTo, engineInfo }) => ({ vehicleBrand, vehicleModel, yearFrom, yearTo, engineInfo })),
@@ -90,11 +92,18 @@ function SellerProductsPage() {
         setError("");
         setNotice("");
         try {
+            const price = Number(form.price);
+            const stockQuantity = Number(form.stockQuantity);
+            if (!Number.isFinite(price) || price <= 0 || !Number.isInteger(stockQuantity) || stockQuantity < 0) {
+                setError("Fiyat sıfırdan büyük, stok sıfır veya daha fazla olmalıdır.");
+                return;
+            }
+            const request: ProductRequest = { ...form, price, stockQuantity };
             if (editingId === null) {
-                await sellerProductService.createProduct(form);
+                await sellerProductService.createProduct(request);
                 setNotice("Ürün inceleme için gönderildi.");
             } else {
-                await sellerProductService.updateProduct(editingId, form);
+                await sellerProductService.updateProduct(editingId, request);
                 setNotice("Ürün güncellendi. İçerik değişiklikleri gerekiyorsa yeniden incelemeye alınır.");
             }
             setFormOpen(false);
@@ -152,8 +161,8 @@ function SellerProductsPage() {
                         <Field label="Kategori"><input required maxLength={100} value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} className={inputClass} /></Field>
                         <Field label="Marka"><input required maxLength={100} value={form.brand} onChange={(event) => setForm({ ...form, brand: event.target.value })} className={inputClass} /></Field>
                         <Field label="OEM / parça numarası"><input maxLength={100} value={form.oemNumber} onChange={(event) => setForm({ ...form, oemNumber: event.target.value })} className={inputClass} /></Field>
-                        <Field label="Fiyat (₺)"><input type="number" min="0" step="0.01" required value={form.price} onChange={(event) => setForm({ ...form, price: Number(event.target.value) })} className={inputClass} /></Field>
-                        <Field label="Stok"><input type="number" min="0" step="1" required value={form.stockQuantity} onChange={(event) => setForm({ ...form, stockQuantity: Number(event.target.value) })} className={inputClass} /></Field>
+                        <Field label="Fiyat (₺)"><input type="number" min="0.01" step="0.01" required value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} className={inputClass} /></Field>
+                        <Field label="Stok"><input type="number" min="0" step="1" required value={form.stockQuantity} onChange={(event) => setForm({ ...form, stockQuantity: event.target.value })} className={inputClass} /></Field>
                         <Field label="Ürün durumu"><select value={form.condition} onChange={(event) => setForm({ ...form, condition: event.target.value as ProductRequest["condition"] })} className={inputClass}><option value="NEW">Sıfır</option><option value="USED">İkinci el</option></select></Field>
                         <Field label="Görsel URL"><input type="url" maxLength={2048} value={form.imageUrl} onChange={(event) => setForm({ ...form, imageUrl: event.target.value })} className={inputClass} placeholder="https://..." /></Field>
                     </div>

@@ -11,6 +11,12 @@ const api = axios.create({
 // Her istekte varsa JWT token'ını otomatik gönderir.
 api.interceptors.request.use(
     (config) => {
+        // The shared JSON default must not leak into multipart uploads. Let the
+        // browser/Axios set Content-Type with the generated multipart boundary.
+        if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+            config.headers.delete("Content-Type");
+        }
+
         const token = localStorage.getItem("token");
 
         if (token) {

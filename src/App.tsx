@@ -26,6 +26,12 @@ import ProductCatalogPage from "./pages/ProductCatalogPage";
 import ProductDetailPage from "./pages/ProductDetailPage";
 import SellerProductsPage from "./pages/SellerProductsPage";
 import SellerRoute from "./components/SellerRoute";
+import MarketplaceCatalogPage from "./pages/MarketplaceCatalogPage";
+import CatalogDetailPage from "./pages/CatalogDetailPage";
+import SellerProfilePage from "./pages/SellerProfilePage";
+import FavoritesPage from "./pages/FavoritesPage";
+import SellerMarketplacePage from "./pages/SellerMarketplacePage";
+import AdminMarketplacePage from "./pages/admin/AdminMarketplacePage";
 
 // Ana Sayfa
 function HomePage() {
@@ -72,6 +78,7 @@ function HomePage() {
               <Link to="/products" className="text-sm text-slate-300 hover:text-white">
                 Ürünler
               </Link>
+              <Link to="/favorites" className="text-sm text-slate-300 hover:text-white">Favorilerim</Link>
 
               <a href="#" className="text-sm text-slate-300 hover:text-white">
                 Satıcılar
@@ -320,9 +327,15 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/products" element={<ProductCatalogPage />} />
+          <Route path="/products" element={<MarketplaceCatalogPage />} />
+          <Route path="/legacy-products" element={<ProductCatalogPage />} />
+          <Route path="/catalog/:id" element={<CatalogDetailPage />} />
+          <Route path="/sellers/:id" element={<SellerProfilePage />} />
+          <Route path="/favorites" element={<FavoritesPage />} />
+          <Route path="/seller/marketplace" element={<SellerRoute><SellerMarketplacePage /></SellerRoute>} />
           <Route path="/products/:id" element={<ProductDetailPage />} />
-          <Route path="/seller/products" element={<SellerRoute><SellerProductsPage /></SellerRoute>} />
+          <Route path="/seller/products" element={<SellerRoute><SellerMarketplacePage /></SellerRoute>} />
+          <Route path="/legacy-seller/products" element={<SellerRoute><SellerProductsPage /></SellerRoute>} />
 
           <Route
               path="/admin"
@@ -336,6 +349,7 @@ function App() {
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="sellers" element={<AdminSellerApplicationsPage />} />
             <Route path="products" element={<AdminProductsPage />} />
+            <Route path="marketplace" element={<AdminMarketplacePage />} />
           </Route>
         </Routes>
       </BrowserRouter>

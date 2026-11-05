@@ -3,6 +3,7 @@ import {
     Users,
     Store,
     Package,
+    ClipboardList,
     LogOut,
     ShieldCheck,
 } from "lucide-react";
@@ -39,6 +40,7 @@ function AdminLayout() {
             path: "/admin/products",
             icon: Package,
         },
+        { title: "Pazaryeri yönetimi", path: "/admin/marketplace", icon: ClipboardList },
     ];
 
     return (

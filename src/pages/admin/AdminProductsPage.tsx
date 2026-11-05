@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Search, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import ProductImage from "../../components/ProductImage";
 import adminProductService from "../../services/adminProductService";
+import marketplaceService from "../../services/marketplaceService";
 import type { ProductModerationStatus, ProductPageResponse, ProductResponse } from "../../types/api";
 
 const statusLabels: Record<ProductModerationStatus, string> = { PENDING: "Bekliyor", APPROVED: "Onaylandı", REJECTED: "Reddedildi" };
@@ -22,6 +24,7 @@ function AdminProductsPage() {
     const [rejectMode, setRejectMode] = useState(false);
     const [rejectionReason, setRejectionReason] = useState("");
     const [error, setError] = useState("");
+    const [pendingMarketplaceCount, setPendingMarketplaceCount] = useState(0);
 
     const loadProducts = useCallback(async () => {
         setLoading(true);
@@ -46,6 +49,11 @@ function AdminProductsPage() {
     }, [search, category, brand, sellerId, moderationStatus, active, page]);
 
     useEffect(() => { void loadProducts(); }, [loadProducts]);
+    useEffect(() => {
+        marketplaceService.adminOffers("PENDING")
+            .then(page => setPendingMarketplaceCount(page.totalElements))
+            .catch(() => setPendingMarketplaceCount(0));
+    }, []);
 
     const closeDetails = () => {
         setSelected(null);
@@ -130,6 +138,10 @@ function AdminProductsPage() {
 
     return (
         <section>
+            <Link to="/admin/marketplace" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-5 py-4 transition hover:border-orange-300 hover:bg-orange-100">
+                <span><strong className="text-[#101d35]">Pazaryeri ilan moderasyonu</strong><span className="ml-2 text-sm text-slate-600">Satıcıların yeni ilanları bu bölümde incelenir.</span></span>
+                <span className="rounded-full bg-orange-500 px-3 py-1 text-sm font-semibold text-white">{pendingMarketplaceCount} bekleyen ilan</span>
+            </Link>
             <div className="mb-8">
                 <h1 className="text-2xl font-bold text-[#101d35]">Ürün Yönetimi</h1>
                 <p className="mt-2 text-slate-500">Ürünleri inceleyin, moderasyon ve yayın durumlarını yönetin.</p>
