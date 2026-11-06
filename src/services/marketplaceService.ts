@@ -4,6 +4,7 @@ import type { ApiResponse, ProductCondition, ProductPageResponse } from "../type
 export interface OfferView { id:number; catalogProductId:number; name:string; description:string|null; offerDescription:string|null; category:string; brand:string; oemNumber:string|null; price:number; stockQuantity:number; condition:ProductCondition; moderationStatus:"PENDING"|"APPROVED"|"REJECTED"; rejectionReason:string|null; active:boolean; priceUpdatedAt:string; stockUpdatedAt:string; legacyImageUrl:string|null; photos:{id:number;url:string|null;displayOrder:number;primaryPhoto:boolean}[]; sellerId:number; sellerName:string; sellerPhone:string; whatsappPhone:string|null; city:string; district:string; sellerLogo:string|null; latitude:number|null; longitude:number|null; streetAddress:string|null; createdAt:string; }
 export interface CatalogView { id:number; name:string; description:string|null; offerDescription:string|null; category:string; brand:string; oemNumber:string|null; moderationStatus:string; active:boolean; vehicleCompatibilities:{id:number;vehicleBrand:string;vehicleModel:string;yearFrom:number;yearTo:number;engineInfo:string|null}[]; offers:OfferView[]; }
 export interface SellerProfile {id:number;storeName:string;phone:string;whatsappPhone:string|null;contactEmail:string|null;city:string;district:string;streetAddress:string|null;latitude:number|null;longitude:number|null;workingHours:string|null;description:string|null;websiteUrl:string|null;logoUrl:string|null;profileActive:boolean;}
+export interface AdminOfferFilters {search?:string;category?:string;brand?:string;sellerId?:number;status?:"PENDING"|"APPROVED"|"REJECTED";active?:boolean;page?:number;size?:number;}
 const data=<T,>(p:Promise<{data:ApiResponse<T>}>)=>p.then(r=>r.data.data);
 const marketplaceService={
  categories:()=>data(api.get<ApiResponse<string[]>>("/api/catalog/categories")),
@@ -24,7 +25,7 @@ const marketplaceService={
  uploadPhoto:(id:number,file:File)=>{const body=new FormData();body.append("file",file);return api.post<ApiResponse<string>>(`/api/seller/offers/${id}/photos`,body).then(r=>r.data.data);},
  updateProfile:(body:Record<string,unknown>)=>data(api.put<ApiResponse<SellerProfile>>("/api/seller/profile",body)),
  profileMine:()=>data(api.get<ApiResponse<SellerProfile>>("/api/seller/profile")),
- adminOffers:(status="PENDING")=>data(api.get<ApiResponse<ProductPageResponse<OfferView>>>("/api/admin/offers",{params:{status}})),
+ adminOffers:(filters:string|AdminOfferFilters={})=>data(api.get<ApiResponse<ProductPageResponse<OfferView>>>("/api/admin/offers",{params:typeof filters==="string"?{status:filters}:filters})),
  adminOfferDetail:(id:number)=>data(api.get<ApiResponse<OfferView>>(`/api/admin/offers/${id}`)),
  adminCatalog:(status?:string)=>data(api.get<ApiResponse<ProductPageResponse<CatalogView>>>("/api/admin/catalog",{params:status?{status}:{}})),
  adminCatalogDetail:(id:number)=>data(api.get<ApiResponse<CatalogView>>(`/api/admin/catalog/${id}`)),
