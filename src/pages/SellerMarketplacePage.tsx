@@ -4,6 +4,9 @@ import {Pencil} from "lucide-react";
 import axios from "axios";
 import marketplaceService, {type OfferView, type CatalogView, type SellerProfile} from "../services/marketplaceService";
 import ProductImage from "../components/ProductImage";
+import VehiclePicker, {type VehicleSelection} from "../components/VehiclePicker";
+
+type CompatibilityForm = VehicleSelection & {yearFrom:string;yearTo:string;engineInfo:string;vehicleBrand:string;vehicleModel:string};
 
 type FormState = {
     catalogProductId: string;
@@ -16,11 +19,12 @@ type FormState = {
     price: string;
     stockQuantity: string;
     condition: "NEW" | "USED";
+    vehicleCompatibilities: CompatibilityForm[];
 };
 
 const empty: FormState = {
     catalogProductId: "", name: "", description: "", offerDescription: "", category: "", brand: "",
-    oemNumber: "", price: "", stockQuantity: "0", condition: "NEW"
+    oemNumber: "", price: "", stockQuantity: "0", condition: "NEW", vehicleCompatibilities: []
 };
 
 type Tab = "profile" | "offers";
@@ -88,6 +92,22 @@ function SellerMarketplacePage() {
 
     const change = (key: keyof FormState, value: string) => setForm(current => ({...current, [key]: value}));
 
+    const updateCompatibility = (index: number, update: Partial<CompatibilityForm>) => setForm(current => ({
+        ...current,
+        vehicleCompatibilities: current.vehicleCompatibilities.map((item, itemIndex) => itemIndex === index ? {...item, ...update} : item)
+    }));
+
+    const toCompatibilityForm = (items: OfferView["vehicleCompatibilities"]): CompatibilityForm[] => items.map(item => ({
+        typeId: String(item.vehicleTypeIds?.[0] ?? ""),
+        brandId: String(item.vehicleBrandId ?? ""),
+        modelId: String(item.vehicleModelId ?? ""),
+        vehicleBrand: item.vehicleBrand,
+        vehicleModel: item.vehicleModel,
+        yearFrom: String(item.yearFrom),
+        yearTo: String(item.yearTo),
+        engineInfo: item.engineInfo || ""
+    }));
+
     const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
@@ -118,6 +138,19 @@ function SellerMarketplacePage() {
             setMessage("Fiyat sıfırdan büyük, stok sıfır veya daha fazla olmalıdır.");
             return;
         }
+        if (form.vehicleCompatibilities.some(item => !item.modelId && !(item.vehicleBrand && item.vehicleModel))) {
+            setMessage("Her araç uyumluluğu için kayıtlı model seçin.");
+            return;
+        }
+        const selectedModelIds = form.vehicleCompatibilities.map(item => item.modelId).filter(Boolean);
+        if (new Set(selectedModelIds).size !== selectedModelIds.length) {
+            setMessage("Aynı araç modeli bir ürüne birden fazla eklenemez.");
+            return;
+        }
+        if (form.vehicleCompatibilities.some(item => !Number.isInteger(Number(item.yearFrom)) || !Number.isInteger(Number(item.yearTo)) || Number(item.yearFrom) < 1886 || Number(item.yearFrom) > Number(item.yearTo))) {
+            setMessage("Araç yılı geçersiz. Başlangıç yılı bitiş yılından büyük olamaz.");
+            return;
+        }
         setBusy(true);
         try {
             const detailsChanged = editingOffer && (
@@ -132,7 +165,14 @@ function SellerMarketplacePage() {
                     : (form.catalogProductId ? Number(form.catalogProductId) : null),
                 price,
                 stockQuantity: stock,
-                vehicleCompatibilities: []
+                vehicleCompatibilities: form.vehicleCompatibilities.map(item => ({
+                    vehicleModelId: item.modelId ? Number(item.modelId) : null,
+                    vehicleBrand: item.vehicleBrand || null,
+                    vehicleModel: item.vehicleModel || null,
+                    yearFrom: Number(item.yearFrom),
+                    yearTo: Number(item.yearTo),
+                    engineInfo: item.engineInfo || null
+                }))
             };
             let saved: OfferView;
             try {
@@ -187,7 +227,8 @@ function SellerMarketplacePage() {
             category: catalog.category,
             brand: catalog.brand,
             oemNumber: catalog.oemNumber || "",
-            description: catalog.description || ""
+            description: catalog.description || "",
+            vehicleCompatibilities: toCompatibilityForm(catalog.vehicleCompatibilities)
         }));
         setCatalogSearch(catalog.name);
         setCatalogMatches([]);
@@ -199,7 +240,8 @@ function SellerMarketplacePage() {
             catalogProductId: String(offer.catalogProductId), name: offer.name,
             description: offer.description || "", offerDescription: offer.offerDescription || "",
             category: offer.category, brand: offer.brand, oemNumber: offer.oemNumber || "",
-            price: String(offer.price), stockQuantity: String(offer.stockQuantity), condition: offer.condition
+            price: String(offer.price), stockQuantity: String(offer.stockQuantity), condition: offer.condition,
+            vehicleCompatibilities: toCompatibilityForm(offer.vehicleCompatibilities)
         });
         setFiles([]);
         setCatalogSearch(offer.name);
@@ -301,6 +343,23 @@ function SellerMarketplacePage() {
                     <label className="text-sm">Marka<select required disabled={!!form.catalogProductId && !editingOffer} value={form.brand} onChange={event => change("brand", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 disabled:bg-slate-100">
                         <option value="">Marka seçin</option>{brands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
                     </select></label>
+                    <div className="sm:col-span-2 rounded-xl border border-slate-200 p-4">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Araç uyumlulukları</h3><p className="mt-1 text-xs text-slate-500">Uyumluluk eklemek isteğe bağlıdır. Katalog uyumluluğu değişikliği yeniden moderasyona gönderilir.</p></div>
+                            <button type="button" onClick={() => setForm(current => ({...current, vehicleCompatibilities: [...current.vehicleCompatibilities, {typeId:"",brandId:"",modelId:"",vehicleBrand:"",vehicleModel:"",yearFrom:"2000",yearTo:"2000",engineInfo:""}]}))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50">+ Araç ekle</button>
+                        </div>
+                        {!form.vehicleCompatibilities.length && <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">Henüz araç uyumluluğu eklenmedi.</p>}
+                        <div className="space-y-3">{form.vehicleCompatibilities.map((item,index) => <div key={`${index}-${item.modelId}`} className="rounded-lg bg-slate-50 p-3">
+                            <VehiclePicker value={{typeId:item.typeId,brandId:item.brandId,modelId:item.modelId}} onChange={selection => updateCompatibility(index,{...selection,vehicleBrand:"",vehicleModel:""})} />
+                            {!item.modelId && item.vehicleModel && <p className="mt-2 text-xs text-amber-700">Eski uyumluluk kaydı merkezi listede eşleşmedi: {item.vehicleBrand} {item.vehicleModel}. Bu kayıt korunur; dilerseniz yeni listeden seçim yapabilirsiniz.</p>}
+                            <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_1.5fr_auto]">
+                                <label className="text-xs text-slate-600">Başlangıç yılı<input type="number" min="1886" value={item.yearFrom} onChange={event=>updateCompatibility(index,{yearFrom:event.target.value})} className="mt-1 w-full rounded-lg border bg-white px-3 py-2" /></label>
+                                <label className="text-xs text-slate-600">Bitiş yılı<input type="number" min="1886" value={item.yearTo} onChange={event=>updateCompatibility(index,{yearTo:event.target.value})} className="mt-1 w-full rounded-lg border bg-white px-3 py-2" /></label>
+                                <label className="text-xs text-slate-600">Motor bilgisi<input value={item.engineInfo} onChange={event=>updateCompatibility(index,{engineInfo:event.target.value})} className="mt-1 w-full rounded-lg border bg-white px-3 py-2" /></label>
+                                <button type="button" onClick={()=>setForm(current=>({...current,vehicleCompatibilities:current.vehicleCompatibilities.filter((_,itemIndex)=>itemIndex!==index)}))} className="self-end rounded-lg px-3 py-2 text-sm font-semibold text-red-600 hover:bg-red-50">Kaldır</button>
+                            </div>
+                        </div>)}</div>
+                        <a href="https://vehiclesdb.com" target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs text-slate-500 underline">Vehicle data by VehiclesDB</a>
+                    </div>
                     <label className="text-sm">Fiyat<input required type="number" min="0.01" step="0.01" value={form.price} onChange={event => change("price", event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
                     <label className="text-sm">Stok<input required type="number" min="0" step="1" value={form.stockQuantity} onChange={event => change("stockQuantity", event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
                     <label className="text-sm">Ürün durumu<select value={form.condition} onChange={event => change("condition", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2">

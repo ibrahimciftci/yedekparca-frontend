@@ -86,6 +86,9 @@ export type ProductModerationStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface ProductVehicleCompatibility {
     id?: number;
+    vehicleModelId?: number | null;
+    vehicleBrandId?: number | null;
+    vehicleTypeIds?: number[];
     vehicleBrand: string;
     vehicleModel: string;
     yearFrom: number;
