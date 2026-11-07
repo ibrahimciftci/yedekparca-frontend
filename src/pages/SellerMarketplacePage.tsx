@@ -1,10 +1,10 @@
-import {useEffect, useRef, useState, type FormEvent} from "react";
-import {Link} from "react-router-dom";
-import {Pencil} from "lucide-react";
+import {useCallback, useEffect, useRef, useState, type FormEvent} from "react";
+import {Pencil, Store} from "lucide-react";
 import axios from "axios";
 import marketplaceService, {type OfferView, type CatalogView, type SellerProfile} from "../services/marketplaceService";
 import ProductImage from "../components/ProductImage";
 import VehiclePicker, {type VehicleSelection} from "../components/VehiclePicker";
+import LocationPicker, {emptyLocation, type LocationSelection} from "../components/LocationPicker";
 
 type CompatibilityForm = VehicleSelection & {yearFrom:string;yearTo:string;engineInfo:string;vehicleBrand:string;vehicleModel:string};
 
@@ -51,14 +51,23 @@ function apiErrorMessage(error: unknown): string | null {
     return null;
 }
 
-function SellerMarketplacePage() {
-    const [tab, setTab] = useState<Tab>("offers");
+function SellerMarketplacePage({ mode = "offers" }: { mode?: Tab }) {
+    const tab = mode;
     const [offers, setOffers] = useState<OfferView[]>([]);
     const [catalogMatches, setCatalogMatches] = useState<CatalogView[]>([]);
     const [catalogSearch, setCatalogSearch] = useState("");
     const [categories, setCategories] = useState<string[]>([]);
     const [brands, setBrands] = useState<string[]>([]);
     const [profile, setProfile] = useState<SellerProfile | null>(null);
+    const [location, setLocation] = useState<LocationSelection>(emptyLocation);
+    const updateLocation = useCallback((value: LocationSelection) => setLocation(value), []);
+    const [logoPreview, setLogoPreview] = useState<string | null>(null);
+    const [logoBusy, setLogoBusy] = useState(false);
+    const [hours, setHours] = useState<Record<string, {closed:boolean;open:string;close:string}>>(() => {
+        const names = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"];
+        try { const old = JSON.parse(profile?.workingHours || "{}"); return Object.fromEntries(names.map(day => [day, old[day] || {closed:true,open:"09:00",close:"18:00"}])); }
+        catch { return Object.fromEntries(names.map(day => [day,{closed:true,open:"09:00",close:"18:00"}])); }
+    });
     const [form, setForm] = useState<FormState>(empty);
     const [files, setFiles] = useState<File[]>([]);
     const [showCreate, setShowCreate] = useState(false);
@@ -81,7 +90,7 @@ function SellerMarketplacePage() {
 
     useEffect(() => {
         void loadOffers();
-        marketplaceService.profileMine().then(setProfile).catch(() => setMessage("Firma profili yüklenemedi."));
+        marketplaceService.profileMine().then(value => { setProfile(value); setLogoPreview(value.logoUrl); setLocation({cityId:value.cityId?String(value.cityId):"",districtId:value.districtId?String(value.districtId):"",cityName:value.city,districtName:value.district}); try { const saved=JSON.parse(value.workingHours||"{}"); setHours(current=>Object.fromEntries(Object.keys(current).map((day,index)=>{const v=saved[day]||saved[["monday","tuesday","wednesday","thursday","friday","saturday","sunday"][index]]||current[day];if(typeof v==="string"){const [open,close]=v.split("-");return [day,{closed:false,open:open?.trim()||"09:00",close:close?.trim()||"18:00"}]}return [day,v]}))); } catch { /* retain default closed days */ } }).catch(() => setMessage("Firma profili yüklenemedi."));
         Promise.all([marketplaceService.categories(), marketplaceService.brands()])
             .then(([categoryList, brandList]) => {
                 setCategories(categoryList);
@@ -111,8 +120,15 @@ function SellerMarketplacePage() {
     const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const data = new FormData(event.currentTarget);
-        const values: Record<string, string> = {};
+        const values: Record<string, unknown> = {};
         data.forEach((value, key) => values[key] = String(value));
+        if (!location.cityId || !location.districtId) { setMessage("Lütfen merkezi listeden il ve ilçe seçin."); return; }
+        values.city = location.cityName;
+        values.district = location.districtName;
+        values.cityId = Number(location.cityId);
+        values.districtId = Number(location.districtId);
+        if (Object.values(hours).some(day => !day.closed && (!day.open || !day.close || day.open >= day.close))) { setMessage("Kapanış saati açılış saatinden sonra olmalıdır."); return; }
+        values.workingHours = JSON.stringify(Object.fromEntries(Object.values(hours).map((value,index)=>[["monday","tuesday","wednesday","thursday","friday","saturday","sunday"][index],value])));
         try {
             const updated = await marketplaceService.updateProfile(values);
             setProfile(updated);
@@ -249,21 +265,8 @@ function SellerMarketplacePage() {
     };
 
     return <main className="min-h-screen bg-slate-50">
-        <header className="bg-[#101d35] p-5 text-white">
-            <div className="mx-auto flex max-w-6xl justify-between"><Link to="/">YEDEKPARÇA</Link><Link to="/products">Kataloğa dön</Link></div>
-        </header>
         <div className="mx-auto max-w-6xl px-4 py-8">
-            <h1 className="text-3xl font-bold text-[#101d35]">Satıcı paneli</h1>
-            <div className="mt-6 flex gap-2 border-b" role="tablist" aria-label="Satıcı yönetimi">
-                <button type="button" role="tab" aria-selected={tab === "offers"} onClick={() => setTab("offers")}
-                        className={`border-b-2 px-5 py-3 font-semibold ${tab === "offers" ? "border-orange-500 text-orange-600" : "border-transparent text-slate-500"}`}>
-                    Ürün ilanları ({offers.length})
-                </button>
-                <button type="button" role="tab" aria-selected={tab === "profile"} onClick={() => setTab("profile")}
-                        className={`border-b-2 px-5 py-3 font-semibold ${tab === "profile" ? "border-orange-500 text-orange-600" : "border-transparent text-slate-500"}`}>
-                    Firma profili
-                </button>
-            </div>
+            <h1 className="text-3xl font-bold text-[#101d35]">{tab === "offers" ? "�r�n ilanlar�m" : "Firma Profili"}</h1>
 
             {message && <div role="status" className="mt-5 flex justify-between rounded-lg bg-amber-50 p-3 text-amber-800">
                 <span>{message}</span><button type="button" onClick={() => setMessage("")} aria-label="Bildirimi kapat">×</button>
@@ -271,13 +274,22 @@ function SellerMarketplacePage() {
 
             {tab === "profile" && <section role="tabpanel" className="mt-6 rounded-2xl border bg-white p-6">
                 <h2 className="text-xl font-bold">Firma profili</h2>
+                <div className="ph-logo-upload"><div className="ph-logo-preview">{logoPreview?<img src={logoPreview} alt="Firma logosu önizleme"/>:<Store/>}</div><div><b>Firma logosu</b><p>JPG, PNG veya WebP · En fazla 2 MB</p><label className="ph-cta ph-upload-button">Logo seç<input type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg" className="sr-only" onChange={async e=>{const file=e.target.files?.[0];if(!file)return;if(file.size>2*1024*1024||!['image/jpeg','image/png','image/webp'].includes(file.type)){setMessage('JPG, PNG veya WebP formatında en fazla 2 MB dosya seçin.');return;}const preview=URL.createObjectURL(file);setLogoPreview(preview);setLogoBusy(true);try{const updated=await marketplaceService.uploadSellerLogo(file);setProfile(updated);setLogoPreview(updated.logoUrl);setMessage('Firma logosu güncellendi.');}catch{setMessage('Logo yüklenemedi; mevcut logo korundu.');setLogoPreview(profile?.logoUrl||null);}finally{setLogoBusy(false);}}}/></label>{logoPreview&&<button type="button" disabled={logoBusy} onClick={async()=>{try{const updated=await marketplaceService.deleteSellerLogo();setProfile(updated);setLogoPreview(null);setMessage('Logo kaldırıldı.');}catch{setMessage('Logo kaldırılamadı.');}}} className="ph-remove-logo">Logoyu kaldır</button>}</div></div>
                 <form key={profile?.id ?? "profile-loading"} onSubmit={saveProfile} className="mt-4 grid gap-3 sm:grid-cols-2">
-                    {([ ["storeName", "Firma adı"], ["phone", "Telefon"], ["whatsappPhone", "WhatsApp numarası"], ["contactEmail", "İletişim e-postası"], ["city", "İl"], ["district", "İlçe"], ["streetAddress", "Açık adres"], ["latitude", "Enlem"], ["longitude", "Boylam"], ["websiteUrl", "Web sitesi"], ["logoUrl", "Firma logosu URL"] ] as const).map(([name, label]) =>
+                    {([ ["storeName", "Firma adı"], ["phone", "Telefon"], ["whatsappPhone", "WhatsApp numarası"], ["contactEmail", "İletişim e-postası"], ["streetAddress", "Açık adres"], ["websiteUrl", "Web sitesi"]] as const).map(([name, label]) =>
                         <label key={name} className="text-sm">{label}<input name={name} defaultValue={profile?.[name] ?? ""}
-                            required={["storeName", "phone", "city", "district"].includes(name)}
+                            required={["storeName", "phone"].includes(name)}
                             className="mt-1 w-full rounded-lg border px-3 py-2" /></label>)}
-                    <label className="text-sm sm:col-span-2">Çalışma saatleri (JSON)<textarea name="workingHours" defaultValue={profile?.workingHours ?? ""}
-                        className="mt-1 w-full rounded-lg border px-3 py-2" placeholder='{"monday":"09:00-18:00"}' /></label>
+                    <div className="sm:col-span-2"><LocationPicker value={location} onChange={updateLocation} required={true} /></div>
+                    <fieldset className="ph-hours"><legend>Çalışma günleri ve saatleri</legend>
+                        <label className="ph-day"><span><input type="checkbox" checked={!hours["Pazartesi"].closed} onChange={e=>setHours(current=>({...current,["Pazartesi"]:{...current["Pazartesi"],closed:!e.target.checked}}))}/> Pazartesi</span>{!hours["Pazartesi"].closed&&<span><input type="time" value={hours["Pazartesi"].open} onChange={e=>setHours(current=>({...current,["Pazartesi"]:{...current["Pazartesi"],open:e.target.value}}))}/><input type="time" value={hours["Pazartesi"].close} onChange={e=>setHours(current=>({...current,["Pazartesi"]:{...current["Pazartesi"],close:e.target.value}}))}/></span>}</label>
+                        <label className="ph-day"><span><input type="checkbox" checked={!hours["Salı"].closed} onChange={e=>setHours(current=>({...current,["Salı"]:{...current["Salı"],closed:!e.target.checked}}))}/> Salı</span>{!hours["Salı"].closed&&<span><input type="time" value={hours["Salı"].open} onChange={e=>setHours(current=>({...current,["Salı"]:{...current["Salı"],open:e.target.value}}))}/><input type="time" value={hours["Salı"].close} onChange={e=>setHours(current=>({...current,["Salı"]:{...current["Salı"],close:e.target.value}}))}/></span>}</label>
+                        <label className="ph-day"><span><input type="checkbox" checked={!hours["Çarşamba"].closed} onChange={e=>setHours(current=>({...current,["Çarşamba"]:{...current["Çarşamba"],closed:!e.target.checked}}))}/> Çarşamba</span>{!hours["Çarşamba"].closed&&<span><input type="time" value={hours["Çarşamba"].open} onChange={e=>setHours(current=>({...current,["Çarşamba"]:{...current["Çarşamba"],open:e.target.value}}))}/><input type="time" value={hours["Çarşamba"].close} onChange={e=>setHours(current=>({...current,["Çarşamba"]:{...current["Çarşamba"],close:e.target.value}}))}/></span>}</label>
+                        <label className="ph-day"><span><input type="checkbox" checked={!hours["Perşembe"].closed} onChange={e=>setHours(current=>({...current,["Perşembe"]:{...current["Perşembe"],closed:!e.target.checked}}))}/> Perşembe</span>{!hours["Perşembe"].closed&&<span><input type="time" value={hours["Perşembe"].open} onChange={e=>setHours(current=>({...current,["Perşembe"]:{...current["Perşembe"],open:e.target.value}}))}/><input type="time" value={hours["Perşembe"].close} onChange={e=>setHours(current=>({...current,["Perşembe"]:{...current["Perşembe"],close:e.target.value}}))}/></span>}</label>
+                        <label className="ph-day"><span><input type="checkbox" checked={!hours["Cuma"].closed} onChange={e=>setHours(current=>({...current,["Cuma"]:{...current["Cuma"],closed:!e.target.checked}}))}/> Cuma</span>{!hours["Cuma"].closed&&<span><input type="time" value={hours["Cuma"].open} onChange={e=>setHours(current=>({...current,["Cuma"]:{...current["Cuma"],open:e.target.value}}))}/><input type="time" value={hours["Cuma"].close} onChange={e=>setHours(current=>({...current,["Cuma"]:{...current["Cuma"],close:e.target.value}}))}/></span>}</label>
+                        <label className="ph-day"><span><input type="checkbox" checked={!hours["Cumartesi"].closed} onChange={e=>setHours(current=>({...current,["Cumartesi"]:{...current["Cumartesi"],closed:!e.target.checked}}))}/> Cumartesi</span>{!hours["Cumartesi"].closed&&<span><input type="time" value={hours["Cumartesi"].open} onChange={e=>setHours(current=>({...current,["Cumartesi"]:{...current["Cumartesi"],open:e.target.value}}))}/><input type="time" value={hours["Cumartesi"].close} onChange={e=>setHours(current=>({...current,["Cumartesi"]:{...current["Cumartesi"],close:e.target.value}}))}/></span>}</label>
+                        <label className="ph-day"><span><input type="checkbox" checked={!hours["Pazar"].closed} onChange={e=>setHours(current=>({...current,["Pazar"]:{...current["Pazar"],closed:!e.target.checked}}))}/> Pazar</span>{!hours["Pazar"].closed&&<span><input type="time" value={hours["Pazar"].open} onChange={e=>setHours(current=>({...current,["Pazar"]:{...current["Pazar"],open:e.target.value}}))}/><input type="time" value={hours["Pazar"].close} onChange={e=>setHours(current=>({...current,["Pazar"]:{...current["Pazar"],close:e.target.value}}))}/></span>}</label>
+                    </fieldset>
                     <label className="text-sm sm:col-span-2">Açıklama<textarea name="description" defaultValue={profile?.description ?? ""}
                         className="mt-1 w-full rounded-lg border px-3 py-2" /></label>
                     <button className="rounded-lg bg-orange-500 px-5 py-3 font-semibold text-white sm:col-span-2">Profili kaydet</button>

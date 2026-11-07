@@ -1,10 +1,11 @@
 
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import authService from "../services/authService";
 
 function LoginPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
 
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -23,10 +24,11 @@ function LoginPage() {
             });
 
             localStorage.setItem("token", response.data.token);
+            window.dispatchEvent(new Event("parcahan-auth-changed"));
 
-            navigate(
-                response.data.user.role === "ADMIN" ? "/admin" : "/"
-            );
+            const redirect = searchParams.get("redirect");
+            const safeRedirect = redirect?.startsWith("/") && !redirect.startsWith("//") ? redirect : null;
+            navigate(safeRedirect || (response.data.user.role === "ADMIN" ? "/admin" : "/"));
         } catch (err: any) {
             setError(
                 err.response?.data?.message ||

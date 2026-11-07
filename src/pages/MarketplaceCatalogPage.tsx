@@ -21,6 +21,8 @@ function MarketplaceCatalogPage() {
     const [brands, setBrands] = useState<string[]>([]);
     const [taxonomyLoading, setTaxonomyLoading] = useState(true);
     const [taxonomyError, setTaxonomyError] = useState("");
+    const [taxonomyRetry, setTaxonomyRetry] = useState(0);
+    const [catalogRetry, setCatalogRetry] = useState(0);
     const [vehicle, setVehicle] = useState<VehicleSelection>({ typeId: "", brandId: "", modelId: "" });
 
     useEffect(() => {
@@ -36,7 +38,7 @@ function MarketplaceCatalogPage() {
             .catch(() => { if (mounted) setTaxonomyError("Kategori, marka veya araç seçenekleri yüklenemedi."); })
             .finally(() => { if (mounted) setTaxonomyLoading(false); });
         return () => { mounted = false; };
-    }, []);
+    }, [taxonomyRetry]);
 
     useEffect(() => {
         setVehicle({
@@ -57,7 +59,7 @@ function MarketplaceCatalogPage() {
             .catch(() => { if (mounted) setError("Ürünler yüklenemedi."); })
             .finally(() => { if (mounted) setLoading(false); });
         return () => { mounted = false; };
-    }, [params]);
+    }, [params, catalogRetry]);
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -80,7 +82,6 @@ function MarketplaceCatalogPage() {
     });
 
     return <main className="min-h-screen bg-slate-50">
-        <header className="bg-[#101d35] p-5 text-white"><div className="mx-auto flex max-w-7xl justify-between"><Link to="/" className="font-bold">YEDEKPARÇA</Link><Link to="/favorites">Favorilerim</Link></div></header>
         <section className="mx-auto max-w-7xl px-4 py-8">
             <h1 className="text-3xl font-bold text-[#101d35]">Ürün kataloğu ve firma fiyatları</h1>
             <p className="mt-2 text-slate-500">Aynı parçayı listeleyen firmaların fiyatlarını karşılaştırın.</p>
@@ -102,11 +103,11 @@ function MarketplaceCatalogPage() {
                     <div className="sm:col-span-2 lg:col-span-4"><VehiclePicker value={vehicle} onChange={setVehicle} />
                         <a href="https://vehiclesdb.com" target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-slate-500 underline">Vehicle data by VehiclesDB</a>
                     </div>
-                    {taxonomyError && <p role="alert" className="text-sm text-red-600 sm:col-span-2 lg:col-span-4">{taxonomyError}</p>}
+                    {taxonomyError && <div role="alert" className="flex items-center gap-3 text-sm text-red-600 sm:col-span-2 lg:col-span-4"><p>{taxonomyError}</p><button type="button" className="rounded border border-red-300 px-3 py-1" onClick={() => setTaxonomyRetry(value => value + 1)}>Yeniden dene</button></div>}
                     <button className="flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-semibold text-white"><Search size={17} />Filtrele</button>
                 </div>
             </form>
-            {loading ? <p>Ürünler yükleniyor…</p> : error ? <p role="alert" className="text-red-600">{error}</p> : !result?.content.length ?
+            {loading ? <p>Ürünler yükleniyor…</p> : error ? <div role="alert" className="flex items-center gap-3 text-red-600"><p>{error}</p><button className="rounded border border-red-300 px-3 py-1" onClick={() => setCatalogRetry(value => value + 1)}>Yeniden dene</button></div> : !result?.content.length ?
                 <div className="rounded-2xl bg-white p-10 text-center"><PackageOpen className="mx-auto text-slate-400" /><p className="mt-3">Eşleşen ürün bulunamadı.</p></div> : <>
                     <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{result.content.map(product => {
                         const photos = imageCandidates(product.offers);
@@ -115,7 +116,7 @@ function MarketplaceCatalogPage() {
                             <div className="flex items-start justify-between"><div><p className="text-xs font-semibold uppercase text-orange-600">{product.brand} · {product.category}</p><h2 className="mt-2 text-lg font-bold text-[#101d35]">{product.name}</h2></div><button aria-label="Favoriye ekle" onClick={() => marketplaceService.favorite(product.id).catch(() => location.assign("/login"))} className="rounded-full border p-2 text-rose-500"><Heart size={18} /></button></div>
                             <p className="mt-4 text-sm text-slate-500">{product.offers.length} firma teklifi</p>
                             <p className="mt-1 text-2xl font-bold">{product.offers.length ? `${Math.min(...product.offers.map(offer => offer.price)).toLocaleString("tr-TR")} ₺` : "Teklif yok"}<span className="ml-2 text-sm font-normal text-slate-500">başlayan fiyat</span></p>
-                            <Link to={`/catalog/${product.id}`} className="mt-5 block rounded-lg bg-[#101d35] px-4 py-3 text-center text-sm font-semibold text-white">Fiyatları karşılaştır</Link>
+                            <Link to={`/catalog/${product.id}`} className="mt-5 block rounded-lg bg-orange-500 px-4 py-3 text-center text-sm font-semibold text-white">Fiyatları karşılaştır</Link>
                         </article>;
                     })}</div>
                     <div className="mt-6 flex justify-between"><button disabled={result.page <= 0} onClick={() => changePage(result.page - 1)} className="rounded border bg-white px-4 py-2 disabled:opacity-40">Önceki</button><span>Sayfa {result.page + 1} / {result.totalPages}</span><button disabled={result.last} onClick={() => changePage(result.page + 1)} className="rounded border bg-white px-4 py-2 disabled:opacity-40">Sonraki</button></div>

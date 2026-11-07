@@ -15,17 +15,20 @@ function VehiclePicker({ value, onChange, disabled = false }: {
     const [loadingBrands, setLoadingBrands] = useState(false);
     const [loadingModels, setLoadingModels] = useState(false);
     const [error, setError] = useState("");
+    const [retry, setRetry] = useState(0);
 
     useEffect(() => {
         let mounted = true;
+        setError("");
         vehicleService.types().then(items => { if (mounted) setTypes(items); })
             .catch(() => { if (mounted) setError("Araç türleri yüklenemedi."); })
             .finally(() => { if (mounted) setLoadingTypes(false); });
         return () => { mounted = false; };
-    }, []);
+    }, [retry]);
 
     useEffect(() => {
         let mounted = true;
+        setError("");
         setBrands([]);
         setModels([]);
         if (!value.typeId) { setLoadingBrands(false); return () => { mounted = false; }; }
@@ -34,10 +37,11 @@ function VehiclePicker({ value, onChange, disabled = false }: {
             .catch(() => { if (mounted) setError("Araç markaları yüklenemedi."); })
             .finally(() => { if (mounted) setLoadingBrands(false); });
         return () => { mounted = false; };
-    }, [value.typeId]);
+    }, [value.typeId, retry]);
 
     useEffect(() => {
         let mounted = true;
+        setError("");
         setModels([]);
         if (!value.brandId || !value.typeId) { setLoadingModels(false); return () => { mounted = false; }; }
         setLoadingModels(true);
@@ -45,7 +49,7 @@ function VehiclePicker({ value, onChange, disabled = false }: {
             .catch(() => { if (mounted) setError("Araç modelleri yüklenemedi."); })
             .finally(() => { if (mounted) setLoadingModels(false); });
         return () => { mounted = false; };
-    }, [value.brandId, value.typeId]);
+    }, [value.brandId, value.typeId, retry]);
 
     const selectClass = "mt-1 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm disabled:bg-slate-100";
     return <div className="grid gap-3 sm:grid-cols-3">
@@ -58,7 +62,7 @@ function VehiclePicker({ value, onChange, disabled = false }: {
         <label className="text-sm">Araç modeli<select disabled={disabled || !value.brandId || loadingModels} value={value.modelId} onChange={event => onChange({ ...value, modelId: event.target.value })} className={selectClass}>
             <option value="">{loadingModels ? "Yükleniyor…" : !value.brandId ? "Önce marka seçin" : models.length ? "Model seçin" : "Bu markada model yok"}</option>{models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}
         </select></label>
-        {error && <p role="alert" className="text-xs text-red-600 sm:col-span-3">{error}</p>}
+        {error && <div role="alert" className="flex items-center gap-2 text-xs text-red-600 sm:col-span-3"><p>{error}</p><button type="button" className="rounded border border-red-300 px-2 py-1" onClick={() => setRetry(value => value + 1)}>Yeniden dene</button></div>}
         {!error && value.typeId && !loadingBrands && !brands.length && <p className="text-xs text-slate-500 sm:col-span-3">Seçilen araç türünde henüz kayıtlı marka yok.</p>}
     </div>;
 }

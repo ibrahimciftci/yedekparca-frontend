@@ -74,6 +74,8 @@ export interface SellerApplicationRequest {
     phone: string;
     city: string;
     district: string;
+    cityId: number;
+    districtId: number;
     description?: string;
 }
 
