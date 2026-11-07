@@ -1,16 +1,23 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Search, Heart, PackageOpen } from "lucide-react";
+import { CarFront, ChevronDown, ChevronUp, CircleDollarSign, Heart, Package, Search, SlidersHorizontal, Tag, X } from "lucide-react";
 import marketplaceService, { type CatalogView, type OfferView } from "../services/marketplaceService";
 import ProductImage from "../components/ProductImage";
-import VehiclePicker, { type VehicleSelection } from "../components/VehiclePicker";
-import vehicleService from "../services/vehicleService";
+import PageHeading from "../components/PageHeading";
+import vehicleService, { type VehicleBrand, type VehicleModel, type VehicleType } from "../services/vehicleService";
 import type { ProductPageResponse } from "../types/api";
 
-const input = "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm";
-const imageCandidates = (offers: OfferView[]) => Array.from(new Set(offers.flatMap(offer =>
+const input = "ph-catalog-control";
+const photoUrls = (offers: OfferView[]) => Array.from(new Set(offers.flatMap(offer =>
     [...offer.photos].sort((a, b) => Number(b.primaryPhoto) - Number(a.primaryPhoto) || a.displayOrder - b.displayOrder)
         .map(photo => photo.url).concat(offer.legacyImageUrl)).filter((url): url is string => Boolean(url))));
+
+const FILTER_LABELS: Record<string, string> = {
+    search: "Arama", category: "Kategori", brand: "Ürün markası", oemNumber: "OEM / parça no",
+    minPrice: "En düşük fiyat", maxPrice: "En yüksek fiyat", condition: "Ürün durumu",
+    modelYear: "Model yılı", engineInfo: "Motor bilgisi", vehicleTypeId: "Araç türü",
+    vehicleBrandId: "Araç markası", vehicleModelId: "Araç modeli",
+};
 
 function MarketplaceCatalogPage() {
     const [params, setParams] = useSearchParams();
@@ -18,35 +25,64 @@ function MarketplaceCatalogPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [categories, setCategories] = useState<string[]>([]);
-    const [brands, setBrands] = useState<string[]>([]);
+    const [productBrands, setProductBrands] = useState<string[]>([]);
+    const [types, setTypes] = useState<VehicleType[]>([]);
+    const [vehicleBrands, setVehicleBrands] = useState<VehicleBrand[]>([]);
+    const [models, setModels] = useState<VehicleModel[]>([]);
     const [taxonomyLoading, setTaxonomyLoading] = useState(true);
+    const [brandLoading, setBrandLoading] = useState(false);
+    const [modelLoading, setModelLoading] = useState(false);
     const [taxonomyError, setTaxonomyError] = useState("");
     const [taxonomyRetry, setTaxonomyRetry] = useState(0);
     const [catalogRetry, setCatalogRetry] = useState(0);
-    const [vehicle, setVehicle] = useState<VehicleSelection>({ typeId: "", brandId: "", modelId: "" });
+    const [advancedOpen, setAdvancedOpen] = useState(false);
+    const [vehicle, setVehicle] = useState({ typeId: "", brandId: "", modelId: "" });
+    const typeId = params.get("vehicleTypeId") || "";
+    const brandId = params.get("vehicleBrandId") || "";
+    const modelId = params.get("vehicleModelId") || "";
 
     useEffect(() => {
         let mounted = true;
         setTaxonomyLoading(true);
+        setTaxonomyError("");
         Promise.all([marketplaceService.categories(), marketplaceService.brands(), vehicleService.types()])
-            .then(([categoryList, brandList]) => {
+            .then(([categoryList, brandList, typeList]) => {
                 if (!mounted) return;
                 setCategories(categoryList);
-                setBrands(brandList);
-                setTaxonomyError("");
+                setProductBrands(brandList);
+                setTypes(typeList);
             })
-            .catch(() => { if (mounted) setTaxonomyError("Kategori, marka veya araç seçenekleri yüklenemedi."); })
+            .catch(() => { if (mounted) setTaxonomyError("Kategori, ürün markası veya araç türü seçenekleri yüklenemedi."); })
             .finally(() => { if (mounted) setTaxonomyLoading(false); });
         return () => { mounted = false; };
     }, [taxonomyRetry]);
 
     useEffect(() => {
-        setVehicle({
-            typeId: params.get("vehicleTypeId") || "",
-            brandId: params.get("vehicleBrandId") || "",
-            modelId: params.get("vehicleModelId") || "",
-        });
-    }, [params]);
+        setVehicle({ typeId, brandId, modelId });
+    }, [typeId, brandId, modelId]);
+
+    useEffect(() => {
+        let mounted = true;
+        setBrandLoading(true);
+        setVehicleBrands([]);
+        vehicleService.brands(vehicle.typeId ? Number(vehicle.typeId) : undefined)
+            .then(items => { if (mounted) { setVehicleBrands(items); setTaxonomyError(""); } })
+            .catch(() => { if (mounted) setTaxonomyError("Araç markaları yüklenemedi."); })
+            .finally(() => { if (mounted) setBrandLoading(false); });
+        return () => { mounted = false; };
+    }, [vehicle.typeId, taxonomyRetry]);
+
+    useEffect(() => {
+        let mounted = true;
+        setModels([]);
+        if (!vehicle.brandId) { setModelLoading(false); return () => { mounted = false; }; }
+        setModelLoading(true);
+        vehicleService.models(Number(vehicle.brandId), vehicle.typeId ? Number(vehicle.typeId) : undefined)
+            .then(items => { if (mounted) { setModels(items); setTaxonomyError(""); } })
+            .catch(() => { if (mounted) setTaxonomyError("Seçilen araç markasının modelleri yüklenemedi."); })
+            .finally(() => { if (mounted) setModelLoading(false); });
+        return () => { mounted = false; };
+    }, [vehicle.brandId, vehicle.typeId, taxonomyRetry]);
 
     useEffect(() => {
         let mounted = true;
@@ -56,10 +92,24 @@ function MarketplaceCatalogPage() {
         params.forEach((value, key) => { if (key !== "page") filters[key] = value; });
         marketplaceService.catalog(filters, Number(params.get("page") || 0))
             .then(page => { if (mounted) setResult(page); })
-            .catch(() => { if (mounted) setError("Ürünler yüklenemedi."); })
+            .catch(() => { if (mounted) setError("Ürünler yüklenemedi. Bağlantınızı kontrol edip yeniden deneyin."); })
             .finally(() => { if (mounted) setLoading(false); });
         return () => { mounted = false; };
     }, [params, catalogRetry]);
+
+    const activeFilters: [string, string][] = [];
+    params.forEach((value, key) => { if (key !== "page") activeFilters.push([key, value]); });
+    const advancedKeys = ["brand", "oemNumber", "minPrice", "maxPrice", "vehicleTypeId", "modelYear", "engineInfo"];
+    const activeAdvancedCount = activeFilters.filter(([key]) => advancedKeys.includes(key)).length;
+    const optionLabels: Record<string, Record<string, string>> = {
+        category: Object.fromEntries(categories.map(value => [value, value])),
+        brand: Object.fromEntries(productBrands.map(value => [value, value])),
+        vehicleTypeId: Object.fromEntries(types.map(value => [String(value.id), value.name])),
+        vehicleBrandId: Object.fromEntries(vehicleBrands.map(value => [String(value.id), value.name])),
+        vehicleModelId: Object.fromEntries(models.map(value => [String(value.id), value.name])),
+        condition: { NEW: "Sıfır", USED: "İkinci el" },
+    };
+    const displayFilter = (key: string, value: string) => `${FILTER_LABELS[key] || key}: ${optionLabels[key]?.[value] || value}`;
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -74,55 +124,79 @@ function MarketplaceCatalogPage() {
         setParams(next);
     };
 
+    const removeFilter = (removedKey: string) => setParams(current => {
+        const next = new URLSearchParams(current);
+        next.delete(removedKey);
+        next.delete("page");
+        if (removedKey === "vehicleTypeId") { next.delete("vehicleBrandId"); next.delete("vehicleModelId"); }
+        if (removedKey === "vehicleBrandId") next.delete("vehicleModelId");
+        return next;
+    });
+    const clearFilters = () => setParams(new URLSearchParams());
     const changePage = (nextPage: number) => setParams(current => {
         const next = new URLSearchParams(current);
-        if (nextPage <= 0) next.delete("page");
-        else next.set("page", String(nextPage));
+        if (nextPage <= 0) next.delete("page"); else next.set("page", String(nextPage));
         return next;
     });
 
-    return <main className="min-h-screen bg-slate-50">
-        <section className="mx-auto max-w-7xl px-4 py-8">
-            <h1 className="text-3xl font-bold text-[#101d35]">Ürün kataloğu ve firma fiyatları</h1>
-            <p className="mt-2 text-slate-500">Aynı parçayı listeleyen firmaların fiyatlarını karşılaştırın.</p>
-            <form onSubmit={submit} className="my-6 rounded-2xl border bg-white p-4">
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <input name="search" defaultValue={params.get("search") || ""} placeholder="Ürün, marka veya OEM ara" className={input} />
-                    <select name="category" defaultValue={params.get("category") || ""} disabled={taxonomyLoading || !categories.length} className={input}>
-                        <option value="">{taxonomyLoading ? "Kategoriler yükleniyor…" : "Tüm kategoriler"}</option>{categories.map(value => <option key={value} value={value}>{value}</option>)}
-                    </select>
-                    <select name="brand" defaultValue={params.get("brand") || ""} disabled={taxonomyLoading || !brands.length} className={input}>
-                        <option value="">{taxonomyLoading ? "Ürün markaları yükleniyor…" : "Tüm ürün markaları"}</option>{brands.map(value => <option key={value} value={value}>{value}</option>)}
-                    </select>
-                    <input name="oemNumber" defaultValue={params.get("oemNumber") || ""} placeholder="OEM / parça no" className={input} />
-                    <input name="minPrice" type="number" min="0" step="0.01" defaultValue={params.get("minPrice") || ""} placeholder="En düşük fiyat" className={input} />
-                    <input name="maxPrice" type="number" min="0" step="0.01" defaultValue={params.get("maxPrice") || ""} placeholder="En yüksek fiyat" className={input} />
-                    <select name="condition" defaultValue={params.get("condition") || ""} className={input}><option value="">Sıfır / ikinci el</option><option value="NEW">Sıfır</option><option value="USED">İkinci el</option></select>
-                    <input name="modelYear" type="number" min="1886" defaultValue={params.get("modelYear") || ""} placeholder="Model yılı" className={input} />
-                    <input name="engineInfo" defaultValue={params.get("engineInfo") || ""} placeholder="Motor bilgisi" className={input} />
-                    <div className="sm:col-span-2 lg:col-span-4"><VehiclePicker value={vehicle} onChange={setVehicle} />
-                        <a href="https://vehiclesdb.com" target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-slate-500 underline">Vehicle data by VehiclesDB</a>
-                    </div>
-                    {taxonomyError && <div role="alert" className="flex items-center gap-3 text-sm text-red-600 sm:col-span-2 lg:col-span-4"><p>{taxonomyError}</p><button type="button" className="rounded border border-red-300 px-3 py-1" onClick={() => setTaxonomyRetry(value => value + 1)}>Yeniden dene</button></div>}
-                    <button className="flex items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-semibold text-white"><Search size={17} />Filtrele</button>
+    return <main className="ph-catalog-page">
+        <section className="ph-page-shell">
+            <PageHeading icon={Package} title="Ürünler" description="Yedek parça, aksesuar ve otomotiv ürünlerini keşfedin." />
+
+            <form key={params.toString()} onSubmit={submit} className="ph-catalog-filter-panel">
+                <div className="ph-catalog-main-filters">
+                    <label className="ph-catalog-search"><span className="sr-only">Ürün adı, OEM veya parça numarası ara</span><Search size={19} /><input name="search" defaultValue={params.get("search") || ""} placeholder="Ürün adı, OEM veya parça numarası ara..." /></label>
+                    <label className="ph-select-field"><Tag size={17} /><span className="sr-only">Kategori</span><select name="category" defaultValue={params.get("category") || ""} disabled={taxonomyLoading || !categories.length}><option value="">{taxonomyLoading ? "Yükleniyor…" : "Tüm kategoriler"}</option>{categories.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+                    <label className="ph-select-field"><CarFront size={18} /><span className="sr-only">Araç markası</span><select value={vehicle.brandId} disabled={brandLoading || !vehicleBrands.length} onChange={event => setVehicle(value => ({ ...value, brandId: event.target.value, modelId: "" }))}><option value="">{brandLoading ? "Markalar yükleniyor…" : "Tüm markalar"}</option>{vehicleBrands.map(brand => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</select></label>
+                    <label className="ph-select-field"><CarFront size={18} /><span className="sr-only">Araç modeli</span><select value={vehicle.modelId} disabled={!vehicle.brandId || modelLoading} onChange={event => setVehicle(value => ({ ...value, modelId: event.target.value }))}><option value="">{!vehicle.brandId ? "Tüm modeller" : modelLoading ? "Modeller yükleniyor…" : "Tüm modeller"}</option>{models.map(model => <option key={model.id} value={model.id}>{model.name}</option>)}</select></label>
+                    <label className="ph-select-field"><Tag size={17} /><span className="sr-only">Ürün durumu</span><select name="condition" defaultValue={params.get("condition") || ""}><option value="">Tümü</option><option value="NEW">Sıfır</option><option value="USED">İkinci el</option></select></label>
+                    <button className="ph-filter-primary" type="submit"><Search size={18} />Ara</button>
                 </div>
+
+                <div className="ph-advanced-wrap">
+                    <button type="button" className="ph-advanced-toggle" aria-expanded={advancedOpen} onClick={() => setAdvancedOpen(open => !open)}>
+                        <SlidersHorizontal size={17} /><strong>Gelişmiş Filtreler ({activeAdvancedCount})</strong>{advancedOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                    </button>
+                    {advancedOpen && <div className="ph-advanced-grid">
+                        <label>Ürün markası<select name="brand" defaultValue={params.get("brand") || ""} disabled={taxonomyLoading || !productBrands.length} className={input}><option value="">Tüm markalar</option>{productBrands.map(value => <option key={value} value={value}>{value}</option>)}</select></label>
+                        <label>OEM / Parça No<input name="oemNumber" defaultValue={params.get("oemNumber") || ""} placeholder="OEM veya parça no..." className={input} /></label>
+                        <label>Fiyat aralığı<span className="ph-price-range"><input name="minPrice" type="number" min="0" step="0.01" defaultValue={params.get("minPrice") || ""} placeholder="Min ₺" className={input} /><input name="maxPrice" type="number" min="0" step="0.01" defaultValue={params.get("maxPrice") || ""} placeholder="Max ₺" className={input} /></span></label>
+                        <label>Araç türü<select name="vehicleTypeId" value={vehicle.typeId} onChange={event => setVehicle({ typeId: event.target.value, brandId: "", modelId: "" })} disabled={taxonomyLoading || !types.length} className={input}><option value="">Tüm türler</option>{types.map(type => <option key={type.id} value={type.id}>{type.name}</option>)}</select></label>
+                        <label>Model yılı<input name="modelYear" type="number" min="1886" max="2100" defaultValue={params.get("modelYear") || ""} placeholder="Örn. 2020" className={input} /></label>
+                        <label>Motor bilgisi<input name="engineInfo" defaultValue={params.get("engineInfo") || ""} placeholder="Motor bilgisi..." className={input} /></label>
+                    </div>}
+                </div>
+                {taxonomyError && <div role="alert" className="ph-taxonomy-error"><span>{taxonomyError}</span><button type="button" onClick={() => setTaxonomyRetry(value => value + 1)}>Yeniden dene</button></div>}
             </form>
-            {loading ? <p>Ürünler yükleniyor…</p> : error ? <div role="alert" className="flex items-center gap-3 text-red-600"><p>{error}</p><button className="rounded border border-red-300 px-3 py-1" onClick={() => setCatalogRetry(value => value + 1)}>Yeniden dene</button></div> : !result?.content.length ?
-                <div className="rounded-2xl bg-white p-10 text-center"><PackageOpen className="mx-auto text-slate-400" /><p className="mt-3">Eşleşen ürün bulunamadı.</p></div> : <>
-                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{result.content.map(product => {
-                        const photos = imageCandidates(product.offers);
-                        return <article key={product.id} className="rounded-2xl border bg-white p-5 shadow-sm">
-                            <ProductImage src={photos[0]} fallbackSrcs={photos.slice(1)} alt={product.name} className="mb-4 h-40 w-full rounded-xl" />
-                            <div className="flex items-start justify-between"><div><p className="text-xs font-semibold uppercase text-orange-600">{product.brand} · {product.category}</p><h2 className="mt-2 text-lg font-bold text-[#101d35]">{product.name}</h2></div><button aria-label="Favoriye ekle" onClick={() => marketplaceService.favorite(product.id).catch(() => location.assign("/login"))} className="rounded-full border p-2 text-rose-500"><Heart size={18} /></button></div>
-                            <p className="mt-4 text-sm text-slate-500">{product.offers.length} firma teklifi</p>
-                            <p className="mt-1 text-2xl font-bold">{product.offers.length ? `${Math.min(...product.offers.map(offer => offer.price)).toLocaleString("tr-TR")} ₺` : "Teklif yok"}<span className="ml-2 text-sm font-normal text-slate-500">başlayan fiyat</span></p>
-                            <Link to={`/catalog/${product.id}`} className="mt-5 block rounded-lg bg-orange-500 px-4 py-3 text-center text-sm font-semibold text-white">Fiyatları karşılaştır</Link>
+
+            <div className="ph-filter-summary">
+                <div className="ph-active-filters"><strong>Aktif Filtreler:</strong>
+                    {activeFilters.length ? activeFilters.map(([key, value]) => <button key={key} className="ph-filter-chip" type="button" onClick={() => removeFilter(key)}>{displayFilter(key, value)}<X size={14} /></button>) : <span className="ph-no-filters">Filtre seçilmedi</span>}
+                    {activeFilters.length > 0 && <button type="button" className="ph-clear-chips" onClick={clearFilters}>Tümünü Temizle <X size={14} /></button>}
+                </div>
+                {!loading && !error && result && <strong className="ph-result-count">{result.totalElements} ürün bulundu</strong>}
+            </div>
+
+            {loading ? <p role="status" className="ph-state-message">Ürünler yükleniyor…</p> : error ? <div role="alert" className="ph-catalog-error"><p>{error}</p><button onClick={() => setCatalogRetry(value => value + 1)}>Yeniden dene</button></div> : !result?.content.length ?
+                <div className="ph-empty-state"><Package size={31} /><p>Eşleşen ürün bulunamadı.</p>{activeFilters.length > 0 && <button className="ph-filter-reset" onClick={clearFilters}>Filtreleri temizle</button>}</div> : <>
+                    <div className="ph-catalog-grid">{result.content.map(product => {
+                        const photos = photoUrls(product.offers);
+                        return <article key={product.id} className="ph-catalog-card">
+                            <div className="ph-catalog-card-image"><ProductImage src={photos[0]} fallbackSrcs={photos.slice(1)} alt={product.name} className="h-full w-full" /><button aria-label="Favoriye ekle" onClick={() => marketplaceService.favorite(product.id).catch(() => location.assign("/login"))} className="ph-favorite-button"><Heart size={19} /></button></div>
+                            <div className="ph-catalog-card-body"><p className="ph-catalog-eyebrow">{product.brand} <span>·</span> {product.category}</p><h2>{product.name}</h2>
+                                {product.oemNumber && <p className="ph-catalog-oem">OEM: {product.oemNumber}</p>}
+                                <div className="ph-catalog-card-meta"><span>{product.offers.length} satıcı</span><span>{product.offers.some(offer => offer.condition === "USED") && !product.offers.some(offer => offer.condition === "NEW") ? "İkinci el" : "Yeni / ikinci el"}</span></div>
+                                <div className="ph-catalog-price"><CircleDollarSign size={19} /><strong>{product.offers.length ? `${Math.min(...product.offers.map(offer => offer.price)).toLocaleString("tr-TR")} ₺` : "Teklif yok"}</strong><small>başlayan fiyat</small></div>
+                                <Link to={`/catalog/${product.id}`} className="ph-catalog-detail-link">Fiyatları karşılaştır <ArrowRightIcon /></Link>
+                            </div>
                         </article>;
                     })}</div>
-                    <div className="mt-6 flex justify-between"><button disabled={result.page <= 0} onClick={() => changePage(result.page - 1)} className="rounded border bg-white px-4 py-2 disabled:opacity-40">Önceki</button><span>Sayfa {result.page + 1} / {result.totalPages}</span><button disabled={result.last} onClick={() => changePage(result.page + 1)} className="rounded border bg-white px-4 py-2 disabled:opacity-40">Sonraki</button></div>
+                    {result.totalPages > 1 && <div className="ph-pagination"><button disabled={result.page <= 0} onClick={() => changePage(result.page - 1)}>Önceki</button><span>Sayfa {result.page + 1} / {result.totalPages}</span><button disabled={result.last} onClick={() => changePage(result.page + 1)}>Sonraki</button></div>}
                 </>}
         </section>
     </main>;
 }
+
+function ArrowRightIcon() { return <span aria-hidden="true">→</span>; }
 
 export default MarketplaceCatalogPage;
