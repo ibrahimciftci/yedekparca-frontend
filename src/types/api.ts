@@ -141,7 +141,8 @@ export interface PublicProductResponse {
 
 export interface ProductPageResponse<T> {
     content: T[];
-    page: number;
+    page?: number;
+    number?: number;
     size: number;
     totalElements: number;
     totalPages: number;

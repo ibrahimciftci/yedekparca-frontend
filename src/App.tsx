@@ -1,10 +1,293 @@
-import { BrowserRouter, Routes, Route, Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
-import { ChevronDown, LogOut, Menu, Store, Wrench, ShieldCheck, CarFront, Zap, CircleDot, Lightbulb, Droplets, ArrowRight } from "lucide-react";
-import LoginPage from "./pages/LoginPage"; import RegisterPage from "./pages/RegisterPage"; import ProfilePage from "./pages/ProfilePage"; import AdminRoute from "./components/AdminRoute"; import AdminLayout from "./layouts/AdminLayout"; import AdminDashboardPage from "./pages/admin/AdminDashboardPage"; import AdminUsersPage from "./pages/admin/AdminUsersPage"; import AdminSellerApplicationsPage from "./pages/admin/AdminSellerApplicationsPage"; import AdminProductsPage from "./pages/admin/AdminProductsPage"; import ProductCatalogPage from "./pages/ProductCatalogPage"; import ProductDetailPage from "./pages/ProductDetailPage"; import SellerProductsPage from "./pages/SellerProductsPage"; import SellerRoute from "./components/SellerRoute"; import MarketplaceCatalogPage from "./pages/MarketplaceCatalogPage"; import CatalogDetailPage from "./pages/CatalogDetailPage"; import SellerProfilePage from "./pages/SellerProfilePage"; import FavoritesPage from "./pages/FavoritesPage"; import SellerMarketplacePage from "./pages/SellerMarketplacePage"; import SellersDirectory from "./components/SellersDirectory"; import PageHeading from "./components/PageHeading"; import SellerApplyPage from "./pages/SellerApplyPage"; import AdminMarketplacePage from "./pages/admin/AdminMarketplacePage";
-import userService from "./services/userService"; import marketplaceService, { type CatalogView } from "./services/marketplaceService"; import vehicleService, { type VehicleBrand, type VehicleModel, type VehicleType } from "./services/vehicleService"; import type { UserResponse } from "./types/api";
-function PublicLayout(){const [user,setUser]=useState<UserResponse|null>(null),[open,setOpen]=useState(false),[mobile,setMobile]=useState(false);const menu=useRef<HTMLDivElement>(null);const navigate=useNavigate();useEffect(()=>{const load=()=>{if(!localStorage.getItem('token')){setUser(null);return}userService.getProfile().then(r=>setUser(r.data.data)).catch(()=>setUser(null))};load();window.addEventListener('storage',load);window.addEventListener('parcahan-auth-changed',load);return()=>{window.removeEventListener('storage',load);window.removeEventListener('parcahan-auth-changed',load)}},[]);useEffect(()=>{const outside=(e:MouseEvent)=>{if(!menu.current?.contains(e.target as Node))setOpen(false)},key=(e:KeyboardEvent)=>{if(e.key==='Escape')setOpen(false)};document.addEventListener('mousedown',outside);document.addEventListener('keydown',key);return()=>{document.removeEventListener('mousedown',outside);document.removeEventListener('keydown',key)}},[]);const logout=()=>{localStorage.removeItem('token');setUser(null);setOpen(false);navigate('/')};return <div className="ph-site-shell"><header className="ph-nav"><div className="ph-nav-inner"><Link to="/" aria-label="ParçaHan ana sayfa"><img src="/assets/parcahan.svg" className="ph-logo"/></Link><button className="ph-mobile-toggle" onClick={()=>setMobile(!mobile)} aria-label="Menüyü aç"><Menu/></button><nav className={mobile?'ph-links ph-links-open':'ph-links'}>{[['/','Ana Sayfa'],['/products','Ürünler'],['/sellers','Satıcılar'],['/about','Hakkımızda']].map(([to,label])=><NavLink key={to} to={to} end={to==='/'} onClick={()=>setMobile(false)} className={({isActive})=>isActive?'ph-link ph-link-active':'ph-link'}>{label}</NavLink>)}</nav><div className="ph-account">{user?<div className="ph-menu-wrap" ref={menu}><button className="ph-user-button" onClick={()=>setOpen(!open)}>{user.firstName} {user.lastName}<ChevronDown size={16}/></button>{open&&<div className="ph-dropdown"><Link to="/profile" onClick={()=>setOpen(false)}>Profil</Link>{user.role==='SELLER'&&<><Link to="/seller/products" onClick={()=>setOpen(false)}>Ürünlerimi Yönet</Link><Link to="/seller/marketplace" onClick={()=>setOpen(false)}>Firma Profili</Link><Link to="/favorites" onClick={()=>setOpen(false)}>Favorilerim</Link></>}{user.role==='CUSTOMER'&&<><Link to="/favorites" onClick={()=>setOpen(false)}>Favorilerim</Link><Link to="/seller/apply" onClick={()=>setOpen(false)}>{'Sat\u0131c\u0131 Ol'}</Link></>}{user.role==='ADMIN'&&<Link to="/admin" onClick={()=>setOpen(false)}>Yönetim Paneli</Link>}<button onClick={logout}><LogOut size={16}/>Çıkış Yap</button></div>}</div>:<><Link className="ph-login" to="/login">Giriş Yap</Link><Link className="ph-cta" to="/register">Üye Ol</Link></>}</div></div></header><div className="ph-site-content"><Outlet/></div><footer className="ph-footer">© {new Date().getFullYear()} ParçaHan · Yedek Parça Pazaryeri</footer></div>}
-function HomePage(){const navigate=useNavigate();const [search,setSearch]=useState(''),[cats,setCats]=useState<string[]>([]),[brands,setBrands]=useState<string[]>([]),[types,setTypes]=useState<VehicleType[]>([]),[vehicleBrands,setVehicleBrands]=useState<VehicleBrand[]>([]),[models,setModels]=useState<VehicleModel[]>([]),[modelsLoading,setModelsLoading]=useState(false),[category,setCategory]=useState(''),[brand,setBrand]=useState(''),[type,setType]=useState(''),[vehicleBrand,setVehicleBrand]=useState(''),[model,setModel]=useState(''),[items,setItems]=useState<CatalogView[]>([]),[vehicleError,setVehicleError]=useState(""),[vehicleBrandsLoading,setVehicleBrandsLoading]=useState(true);useEffect(()=>{marketplaceService.categories().then(setCats).catch(()=>{});marketplaceService.brands().then(setBrands).catch(()=>{});vehicleService.types().then(setTypes).catch(()=>setVehicleError("Araç türleri yüklenemedi."));vehicleService.brands().then(setVehicleBrands).catch(()=>setVehicleError("Araç markaları yüklenemedi.")).finally(()=>setVehicleBrandsLoading(false));marketplaceService.catalog({},0,8).then(r=>setItems(r.content)).catch(()=>{})},[]);useEffect(()=>{setVehicleBrand('');setModel('');setModels([]);setVehicleBrandsLoading(true);vehicleService.brands(type?Number(type):undefined).then(items=>{setVehicleBrands(items);setVehicleError("")}).catch(()=>setVehicleError("Araç markaları yüklenemedi.")).finally(()=>setVehicleBrandsLoading(false))},[type]);useEffect(()=>{setModel('');if(vehicleBrand){setModelsLoading(true);vehicleService.models(Number(vehicleBrand),type?Number(type):undefined).then(items=>{setModels(items);setVehicleError("")}).catch(()=>setVehicleError("Se?ilen markan?n modelleri y?klenemedi.")).finally(()=>setModelsLoading(false))}else{setModels([]);setModelsLoading(false)}},[vehicleBrand,type]);const go=()=>{const q=new URLSearchParams();if(search)q.set('search',search);if(category)q.set('category',category);if(brand)q.set('brand',brand);if(model)q.set('vehicleModelId',model);if(vehicleBrand)q.set('vehicleBrandId',vehicleBrand);if(type)q.set('vehicleTypeId',type);navigate('/products?'+q.toString())};const icons=[CircleDot,Wrench,CarFront,Zap,Droplets,Store,Lightbulb,ShieldCheck];return <main><section className="ph-hero"><div className="ph-hero-content"><span className="ph-eyebrow">ParçaHan yedek parça pazaryeri</span><h1>Aracınız İçin Doğru Yedek Parça, Doğru Adres</h1><p>Güvenilir satıcılardan, geniş ürün yelpazesiyle orijinal ve muadil yedek parçalara ulaşın.</p><div className="ph-hero-actions"><Link to="/products" className="ph-cta">Ürünleri İncele</Link><Link to="/sellers" className="ph-outline">Satıcıları Gör</Link></div></div></section><div className="ph-search-card"><div className="ph-search-input"><label>Ürün ara</label><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Ürün adı, OEM numarası..."/></div><label>Kategori<select value={category} onChange={e=>setCategory(e.target.value)}><option value="">Tüm kategoriler</option>{cats.map(x=><option key={x}>{x}</option>)}</select></label><label>Ürün Markası<select value={brand} onChange={e=>setBrand(e.target.value)}><option value="">Tüm markalar</option>{brands.map(x=><option key={x}>{x}</option>)}</select></label><label>Araç Markası<select value={vehicleBrand} onChange={e=>setVehicleBrand(e.target.value)}><option value="">{vehicleBrandsLoading?"Markalar yükleniyor…":vehicleBrands.length?"Marka seçin":"Marka bulunamadı"}</option>{vehicleBrands.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label>Araç Modeli<select value={model} onChange={e=>setModel(e.target.value)} disabled={!vehicleBrand}><option value="">{!vehicleBrand?"Önce marka seçin":modelsLoading?"Modeller y?kleniyor\u2026":models.length?"Model seçin":"Model bulunamadı"}</option>{models.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label><button className="ph-cta" onClick={go}>Ara</button><select className="ph-type-select" value={type} onChange={e=>setType(e.target.value)} aria-label="Araç türü"><option value="">Araç türü</option>{types.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select>{vehicleError&&<p className="col-span-full text-sm text-red-600" role="alert">{vehicleError}</p>}</div><section className="ph-section"><div className="ph-section-heading"><div><span className="ph-kicker">Kategoriler</span><h2>İhtiyacınız Olan Parçayı Bulun</h2></div><Link to="/products">Tüm kategoriler <ArrowRight size={17}/></Link></div><div className="ph-category-grid">{(cats.length?cats.slice(0,7):['Fren Sistemi','Motor','Süspansiyon','Elektrik','Yağ ve Bakım','Kaporta','Aydınlatma']).map((x,i)=>{const Icon=icons[i%icons.length];return <Link className="ph-category" to={'/products?category='+encodeURIComponent(x)} key={x}><span><Icon/></span><b>{x}</b><small>Ürünleri keşfedin</small></Link>})}<Link className="ph-category ph-category-all" to="/products"><span><ArrowRight/></span><b>Tüm Kategoriler</b><small>Ürün kataloğunu görüntüleyin</small></Link></div></section><section className="ph-section ph-products"><div className="ph-section-heading"><div><span className="ph-kicker">Özenle seçilmiş</span><h2>Öne Çıkan Ürünler</h2></div><Link to="/products">Tüm Ürünler <ArrowRight size={17}/></Link></div><div className="ph-product-grid">{items.slice(0,8).map(p=>{const offer=p.offers?.find(o=>o.active&&o.moderationStatus==='APPROVED');return <Link to={'/catalog/'+p.id} className="ph-product" key={p.id}><div className="ph-product-image">{offer?.photos?.[0]?.url?<img src={offer.photos[0].url}/>:<Wrench/>}</div><div className="ph-product-info"><small>{p.brand||p.category}</small><b>{p.name}</b><strong>{offer?`${offer.price.toLocaleString('tr-TR')} ₺`:'Satıcıları görüntüle'}</strong>{offer&&<small>{offer.sellerName}</small>}</div></Link>})}</div></section><section className="ph-seller-call"><div><span className="ph-kicker">Güvenilir iş ortakları</span><h2>ParçaHan satıcılarıyla tanışın</h2><p>Onaylı yedek parça satıcılarını keşfedin ve doğrudan iletişime geçin.</p></div><Link to="/sellers" className="ph-cta">Satıcıları Gör <ArrowRight/></Link></section></main>}
-function AboutPage(){return <main className="ph-page-shell ph-about-page"><PageHeading icon={ShieldCheck} title={'Par\u00e7aHan\u2019\u0131 Tan\u0131y\u0131n'} description={'Do\u011fru yedek par\u00e7ay\u0131, do\u011fru sat\u0131c\u0131yla bulu\u015fturmak i\u00e7in buraday\u0131z.'} /><div className="ph-about-content"><p>ParçaHan, araç sahipleri ile yedek parça satıcılarını bir araya getiren bir pazaryeridir. Amacımız, ihtiyaç duyduğunuz parçaları bulmanızı ve güvenilir satıcılara kolayca ulaşmanızı sağlamaktır.</p><div className="ph-about-grid"><article><ShieldCheck/><h2>Güvenilir satıcılar</h2><p>Satıcı başvuruları değerlendirilir; onaylı firmalar platformda görünür.</p></article><article><Wrench/><h2>Karşılaştırın ve ulaşın</h2><p>Ürün seçeneklerini inceleyin, uyumluluk bilgilerini değerlendirin ve satıcıyla doğrudan iletişime geçin.</p></article><article><Store/><h2>Misyonumuz</h2><p>Yedek parça arama sürecini anlaşılır hale getirerek araç sahipleriyle satıcılar arasında kolay bir bağlantı kurmak.</p></article><article><CarFront/><h2>Vizyonumuz</h2><p>Otomotiv yedek parça ekosisteminde erişilebilir ve güven veren bir dijital buluşma alanı olmak.</p></article></div></div></main>}
-function SellersPage(){return <main className="ph-page-shell ph-sellers-page"><PageHeading icon={Store} title={'G\u00fcvenilir Sat\u0131c\u0131lar'} description={'T\u00fcrkiye\u2019nin d\u00f6rt bir yan\u0131ndaki yedek par\u00e7a sat\u0131c\u0131lar\u0131n\u0131 ke\u015ffedin, do\u011fru par\u00e7aya g\u00fcvenle ula\u015f\u0131n.'} /><SellersDirectory/></main>}
-function App(){return <BrowserRouter><Routes><Route element={<PublicLayout/>}><Route path="/" element={<HomePage/>}/><Route path="/about" element={<AboutPage/>}/><Route path="/sellers" element={<SellersPage/>}/><Route path="/login" element={<LoginPage/>}/><Route path="/register" element={<RegisterPage/>}/><Route path="/profile" element={<ProfilePage/>}/><Route path="/products" element={<MarketplaceCatalogPage/>}/><Route path="/legacy-products" element={<ProductCatalogPage/>}/><Route path="/catalog/:id" element={<CatalogDetailPage/>}/><Route path="/sellers/:id" element={<SellerProfilePage/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/seller/apply" element={<SellerApplyPage/>}/><Route path="/seller/marketplace" element={<SellerRoute><SellerMarketplacePage mode="profile"/></SellerRoute>}/><Route path="/products/:id" element={<ProductDetailPage/>}/><Route path="/seller/products" element={<SellerRoute><SellerMarketplacePage mode="offers"/></SellerRoute>}/><Route path="/legacy-seller/products" element={<SellerRoute><SellerProductsPage/></SellerRoute>}/></Route><Route path="/admin" element={<AdminRoute><AdminLayout/></AdminRoute>}><Route index element={<AdminDashboardPage/>}/><Route path="users" element={<AdminUsersPage/>}/><Route path="sellers" element={<AdminSellerApplicationsPage/>}/><Route path="products" element={<AdminProductsPage/>}/><Route path="marketplace" element={<AdminMarketplacePage/>}/></Route></Routes></BrowserRouter>};export default App;
+import {BrowserRouter, Routes, Route, Link, NavLink, Outlet, useNavigate} from "react-router-dom";
+import {useEffect, useRef, useState} from "react";
+import {
+    ChevronDown,
+    LogOut,
+    Menu,
+    Store,
+    Wrench,
+    ShieldCheck,
+    CarFront,
+    Zap,
+    CircleDot,
+    Lightbulb,
+    Droplets,
+    ArrowRight
+} from "lucide-react";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import ProfilePage from "./pages/ProfilePage";
+import AdminRoute from "./components/AdminRoute";
+import AdminLayout from "./layouts/AdminLayout";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+import AdminUsersPage from "./pages/admin/AdminUsersPage";
+import AdminSellerApplicationsPage from "./pages/admin/AdminSellerApplicationsPage";
+import AdminProductsPage from "./pages/admin/AdminProductsPage";
+import ProductCatalogPage from "./pages/ProductCatalogPage";
+import ProductDetailPage from "./pages/ProductDetailPage";
+import SellerProductsPage from "./pages/SellerProductsPage";
+import SellerRoute from "./components/SellerRoute";
+import MarketplaceCatalogPage from "./pages/MarketplaceCatalogPage";
+import CatalogDetailPage from "./pages/CatalogDetailPage";
+import SellerProfilePage from "./pages/SellerProfilePage";
+import FavoritesPage from "./pages/FavoritesPage";
+import SellerMarketplacePage from "./pages/SellerMarketplacePage";
+import SellersDirectory from "./components/SellersDirectory";
+import PageHeading from "./components/PageHeading";
+import SellerApplyPage from "./pages/SellerApplyPage";
+import AdminMarketplacePage from "./pages/admin/AdminMarketplacePage";
+import userService from "./services/userService";
+import marketplaceService, {type CatalogView} from "./services/marketplaceService";
+import vehicleService, {type VehicleBrand, type VehicleModel, type VehicleType} from "./services/vehicleService";
+import type {UserResponse} from "./types/api";
+
+function PublicLayout() {
+    const [user, setUser] = useState<UserResponse | null>(null), [open, setOpen] = useState(false), [mobile, setMobile] = useState(false);
+    const [sessionMessage, setSessionMessage] = useState("");
+    const menu = useRef<HTMLDivElement>(null);
+    const navigate = useNavigate();
+    useEffect(() => {
+        const load = () => {
+            if (!localStorage.getItem('token')) {
+                setUser(null);
+                return
+            }
+            userService.getProfile().then(r => setUser(r.data.data)).catch(() => { setUser(null); if (!localStorage.getItem('token')) window.dispatchEvent(new Event('parcahan-auth-changed')); })
+        };
+        load();
+        window.addEventListener('storage', load);
+        window.addEventListener('parcahan-auth-changed', load);
+        return () => {
+            window.removeEventListener('storage', load);
+            window.removeEventListener('parcahan-auth-changed', load)
+        }
+    }, []);
+    useEffect(() => {
+        const expired = (event: Event) => {
+            setSessionMessage((event as CustomEvent<string>).detail || "Oturumunuzun süresi doldu. Lütfen tekrar giriş yapın.");
+            window.setTimeout(() => setSessionMessage(""), 7000);
+        };
+        window.addEventListener('parcahan-session-expired', expired);
+        return () => window.removeEventListener('parcahan-session-expired', expired);
+    }, []);
+    useEffect(() => {
+        const outside = (e: MouseEvent) => {
+            if (!menu.current?.contains(e.target as Node)) setOpen(false)
+        }, key = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setOpen(false)
+        };
+        document.addEventListener('mousedown', outside);
+        document.addEventListener('keydown', key);
+        return () => {
+            document.removeEventListener('mousedown', outside);
+            document.removeEventListener('keydown', key)
+        }
+    }, []);
+    const logout = () => {
+        localStorage.removeItem('token');
+        import('./services/favoriteStore').then(({resetFavorites}) => resetFavorites());
+        setUser(null);
+        setOpen(false);
+        navigate('/')
+    };
+    return <div className="ph-site-shell">
+        {sessionMessage && <div role="alert" className="fixed left-1/2 top-4 z-[70] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 rounded-xl bg-[#101d35] px-5 py-4 text-center font-semibold text-white shadow-xl">{sessionMessage}</div>}
+        <header className="ph-nav">
+            <div className="ph-nav-inner"><Link to="/" aria-label="ParçaHan ana sayfa"><img src="/assets/parcahan-logo.png"
+                                                                                            className="ph-logo"/></Link>
+                <button className="ph-mobile-toggle" onClick={() => setMobile(!mobile)} aria-label="Menüyü aç"><Menu/>
+                </button>
+                <nav
+                    className={mobile ? 'ph-links ph-links-open' : 'ph-links'}>{[['/', 'Ana Sayfa'], ['/products', 'Ürünler'], ['/sellers', 'Satıcılar'], ['/about', 'Hakkımızda']].map(([to, label]) =>
+                    <NavLink key={to} to={to} end={to === '/'} onClick={() => setMobile(false)}
+                             className={({isActive}) => isActive ? 'ph-link ph-link-active' : 'ph-link'}>{label}</NavLink>)}</nav>
+                <div className="ph-account">{user ? <div className="ph-menu-wrap" ref={menu}>
+                    <button className="ph-user-button"
+                            onClick={() => setOpen(!open)}>{user.firstName} {user.lastName}<ChevronDown size={16}/>
+                    </button>
+                    {open && <div className="ph-dropdown"><Link to="/profile"
+                                                                onClick={() => setOpen(false)}>Profil</Link>{user.role === 'SELLER' && <>
+                        <Link to="/seller/products" onClick={() => setOpen(false)}>Ürünlerimi Yönet</Link><Link
+                        to="/seller/marketplace" onClick={() => setOpen(false)}>Firma Profili</Link><Link
+                        to="/favorites"
+                        onClick={() => setOpen(false)}>Favorilerim</Link></>}{user.role === 'CUSTOMER' && <><Link
+                        to="/favorites" onClick={() => setOpen(false)}>Favorilerim</Link><Link to="/seller/apply"
+                                                                                               onClick={() => setOpen(false)}>{'Sat\u0131c\u0131 Ol'}</Link></>}{user.role === 'ADMIN' &&
+                        <Link to="/admin" onClick={() => setOpen(false)}>Yönetim Paneli</Link>}
+                        <button onClick={logout}><LogOut size={16}/>Çıkış Yap</button>
+                    </div>}</div> : <><Link className="ph-login" to="/login">Giriş Yap</Link><Link className="ph-cta"
+                                                                                                   to="/register">Üye
+                    Ol</Link></>}</div>
+            </div>
+        </header>
+        <div className="ph-site-content"><Outlet/></div>
+        <footer className="ph-footer">© {new Date().getFullYear()} ParçaHan · Yedek Parça Pazaryeri</footer>
+    </div>
+}
+
+function HomePage() {
+    const navigate = useNavigate();
+    const [search, setSearch] = useState(''), [cats, setCats] = useState<string[]>([]), [brands, setBrands] = useState<string[]>([]), [types, setTypes] = useState<VehicleType[]>([]), [vehicleBrands, setVehicleBrands] = useState<VehicleBrand[]>([]), [models, setModels] = useState<VehicleModel[]>([]), [modelsLoading, setModelsLoading] = useState(false), [category, setCategory] = useState(''), [brand, setBrand] = useState(''), [type, setType] = useState(''), [vehicleBrand, setVehicleBrand] = useState(''), [model, setModel] = useState(''), [items, setItems] = useState<CatalogView[]>([]), [vehicleError, setVehicleError] = useState(""), [vehicleBrandsLoading, setVehicleBrandsLoading] = useState(true);
+    useEffect(() => {
+        marketplaceService.categories().then(setCats).catch(() => {
+        });
+        marketplaceService.brands().then(setBrands).catch(() => {
+        });
+        vehicleService.types().then(setTypes).catch(() => setVehicleError("Araç türleri yüklenemedi."));
+        vehicleService.brands().then(setVehicleBrands).catch(() => setVehicleError("Araç markaları yüklenemedi.")).finally(() => setVehicleBrandsLoading(false));
+        marketplaceService.catalog({}, 0, 8).then(r => setItems(r.content)).catch(() => {
+        })
+    }, []);
+    useEffect(() => {
+        setVehicleBrand('');
+        setModel('');
+        setModels([]);
+        setVehicleBrandsLoading(true);
+        vehicleService.brands(type ? Number(type) : undefined).then(items => {
+            setVehicleBrands(items);
+            setVehicleError("")
+        }).catch(() => setVehicleError("Araç markaları yüklenemedi.")).finally(() => setVehicleBrandsLoading(false))
+    }, [type]);
+    useEffect(() => {
+        setModel('');
+        if (vehicleBrand) {
+            setModelsLoading(true);
+            vehicleService.models(Number(vehicleBrand), type ? Number(type) : undefined).then(items => {
+                setModels(items);
+                setVehicleError("")
+            }).catch(() => setVehicleError("Se?ilen markan?n modelleri y?klenemedi.")).finally(() => setModelsLoading(false))
+        } else {
+            setModels([]);
+            setModelsLoading(false)
+        }
+    }, [vehicleBrand, type]);
+    const go = () => {
+        const q = new URLSearchParams();
+        if (search) q.set('search', search);
+        if (category) q.set('category', category);
+        if (brand) q.set('brand', brand);
+        if (model) q.set('vehicleModelId', model);
+        if (vehicleBrand) q.set('vehicleBrandId', vehicleBrand);
+        if (type) q.set('vehicleTypeId', type);
+        navigate('/products?' + q.toString())
+    };
+    const icons = [CircleDot, Wrench, CarFront, Zap, Droplets, Store, Lightbulb, ShieldCheck];
+    return <main>
+        <section className="ph-hero">
+            <div className="ph-hero-content"><span className="ph-eyebrow">ParçaHan yedek parça pazaryeri</span>
+                <h1>Aracınız İçin Doğru Yedek Parça, Doğru Adres</h1><p>Güvenilir satıcılardan, geniş ürün yelpazesiyle
+                    orijinal ve muadil yedek parçalara ulaşın.</p>
+                <div className="ph-hero-actions"><Link to="/products" className="ph-cta">Ürünleri İncele</Link><Link
+                    to="/sellers" className="ph-outline">Satıcıları Gör</Link></div>
+            </div>
+        </section>
+        <div className="ph-search-card">
+            <div className="ph-search-input"><label>Ürün ara</label><input value={search}
+                                                                           onChange={e => setSearch(e.target.value)}
+                                                                           placeholder="Ürün adı, OEM numarası..."/>
+            </div>
+            <label>Kategori<select value={category} onChange={e => setCategory(e.target.value)}>
+                <option value="">Tüm kategoriler</option>
+                {cats.map(x => <option key={x}>{x}</option>)}</select></label><label>Ürün Markası<select value={brand}
+                                                                                                         onChange={e => setBrand(e.target.value)}>
+            <option value="">Tüm markalar</option>
+            {brands.map(x => <option key={x}>{x}</option>)}</select></label><label>Araç Markası<select
+            value={vehicleBrand} onChange={e => setVehicleBrand(e.target.value)}>
+            <option
+                value="">{vehicleBrandsLoading ? "Markalar yükleniyor…" : vehicleBrands.length ? "Marka seçin" : "Marka bulunamadı"}</option>
+            {vehicleBrands.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label><label>Araç
+            Modeli<select value={model} onChange={e => setModel(e.target.value)} disabled={!vehicleBrand}>
+                <option
+                    value="">{!vehicleBrand ? "Önce marka seçin" : modelsLoading ? "Modeller y?kleniyor\u2026" : models.length ? "Model seçin" : "Model bulunamadı"}</option>
+                {models.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+            <button className="ph-cta" onClick={go}>Ara</button>
+            <select className="ph-type-select" value={type} onChange={e => setType(e.target.value)}
+                    aria-label="Araç türü">
+                <option value="">Araç türü</option>
+                {types.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>{vehicleError &&
+            <p className="col-span-full text-sm text-red-600" role="alert">{vehicleError}</p>}</div>
+        <section className="ph-section">
+            <div className="ph-section-heading">
+                <div><span className="ph-kicker">Kategoriler</span><h2>İhtiyacınız Olan Parçayı Bulun</h2></div>
+                <Link to="/products">Tüm kategoriler <ArrowRight size={17}/></Link></div>
+            <div
+                className="ph-category-grid">{(cats.length ? cats.slice(0, 7) : ['Fren Sistemi', 'Motor', 'Süspansiyon', 'Elektrik', 'Yağ ve Bakım', 'Kaporta', 'Aydınlatma']).map((x, i) => {
+                const Icon = icons[i % icons.length];
+                return <Link className="ph-category" to={'/products?category=' + encodeURIComponent(x)}
+                             key={x}><span><Icon/></span><b>{x}</b><small>Ürünleri keşfedin</small></Link>
+            })}<Link className="ph-category ph-category-all" to="/products"><span><ArrowRight/></span><b>Tüm
+                Kategoriler</b><small>Ürün kataloğunu görüntüleyin</small></Link></div>
+        </section>
+        <section className="ph-section ph-products">
+            <div className="ph-section-heading">
+                <div><span className="ph-kicker">Özenle seçilmiş</span><h2>Öne Çıkan Ürünler</h2></div>
+                <Link to="/products">Tüm Ürünler <ArrowRight size={17}/></Link></div>
+            <div className="ph-product-grid">{items.slice(0, 8).map(p => {
+                const offer = p.offers?.find(o => o.active && o.moderationStatus === 'APPROVED');
+                return <Link to={'/catalog/' + p.id} className="ph-product" key={p.id}>
+                    <div className="ph-product-image">{offer?.photos?.[0]?.url ? <img src={offer.photos[0].url}/> :
+                        <Wrench/>}</div>
+                    <div className="ph-product-info">
+                        <small>{p.brand || p.category}</small><b>{p.name}</b><strong>{offer ? `${offer.price.toLocaleString('tr-TR')} ₺` : 'Satıcıları görüntüle'}</strong>{offer &&
+                        <small>{offer.sellerName}</small>}</div>
+                </Link>
+            })}</div>
+        </section>
+        <section className="ph-seller-call">
+            <div><span className="ph-kicker">Güvenilir iş ortakları</span><h2>ParçaHan satıcılarıyla tanışın</h2>
+                <p>Onaylı yedek parça satıcılarını keşfedin ve doğrudan iletişime geçin.</p></div>
+            <Link to="/sellers" className="ph-cta">Satıcıları Gör <ArrowRight/></Link></section>
+    </main>
+}
+
+function AboutPage() {
+    return <main className="ph-page-shell ph-about-page"><PageHeading icon={ShieldCheck}
+                                                                      title={'Par\u00e7aHan\u2019\u0131 Tan\u0131y\u0131n'}
+                                                                      description={'Otomotiv yedek par\u00e7a sekt\u00f6r\u00fcn\u00fc dijitalle\u015ftiriyor, al\u0131c\u0131larla sat\u0131c\u0131lar aras\u0131nda yeni nesil bir ticaret k\u00f6pr\u00fcs\u00fc kuruyoruz.'}/>
+        <div className="ph-about-content"><p>ParçaHan, araç sahipleri ile yedek parça satıcılarını bir araya getiren bir
+            pazaryeridir. Amacımız, ihtiyaç duyduğunuz parçaları bulmanızı ve güvenilir satıcılara kolayca ulaşmanızı
+            sağlamaktır.</p>
+            <div className="ph-about-grid">
+                <article><ShieldCheck/><h2>Güvenilir satıcılar</h2><p>Satıcı başvuruları değerlendirilir; onaylı
+                    firmalar platformda görünür.</p></article>
+                <article><Wrench/><h2>Karşılaştırın ve ulaşın</h2><p>Ürün seçeneklerini inceleyin, uyumluluk bilgilerini
+                    değerlendirin ve satıcıyla doğrudan iletişime geçin.</p></article>
+                <article><Store/><h2>Misyonumuz</h2><p>Yedek parça arama sürecini anlaşılır hale getirerek araç
+                    sahipleriyle satıcılar arasında kolay bir bağlantı kurmak.</p></article>
+                <article><CarFront/><h2>Vizyonumuz</h2><p>Otomotiv yedek parça ekosisteminde erişilebilir ve güven veren
+                    bir dijital buluşma alanı olmak.</p></article>
+            </div>
+        </div>
+    </main>
+}
+
+function SellersPage() {
+    return <main className="ph-page-shell ph-sellers-page"><PageHeading icon={Store}
+                                                                        title={'G\u00fcvenilir Sat\u0131c\u0131lar'}
+                                                                        description={'T\u00fcrkiye\u2019nin d\u00f6rt bir yan\u0131ndaki yedek par\u00e7a sat\u0131c\u0131lar\u0131n\u0131 ke\u015ffedin, do\u011fru par\u00e7aya g\u00fcvenle ula\u015f\u0131n.'}/><SellersDirectory/>
+    </main>
+}
+
+function App() {
+    return <BrowserRouter><Routes><Route element={<PublicLayout/>}><Route path="/" element={<HomePage/>}/><Route
+        path="/about" element={<AboutPage/>}/><Route path="/sellers" element={<SellersPage/>}/><Route path="/login"
+                                                                                                      element={
+                                                                                                          <LoginPage/>}/><Route
+        path="/register" element={<RegisterPage/>}/><Route path="/profile" element={<ProfilePage/>}/><Route
+        path="/products" element={<MarketplaceCatalogPage/>}/><Route path="/legacy-products"
+                                                                     element={<ProductCatalogPage/>}/><Route
+        path="/catalog/:id" element={<CatalogDetailPage/>}/><Route path="/sellers/:id"
+                                                                   element={<SellerProfilePage/>}/><Route
+        path="/favorites" element={<FavoritesPage/>}/><Route path="/seller/apply" element={<SellerApplyPage/>}/><Route
+        path="/seller/marketplace" element={<SellerRoute><SellerMarketplacePage mode="profile"/></SellerRoute>}/><Route
+        path="/products/:id" element={<ProductDetailPage/>}/><Route path="/seller/products"
+                                                                    element={<SellerRoute><SellerMarketplacePage
+                                                                        mode="offers"/></SellerRoute>}/><Route
+        path="/legacy-seller/products" element={<SellerRoute><SellerProductsPage/></SellerRoute>}/></Route><Route
+        path="/admin" element={<AdminRoute><AdminLayout/></AdminRoute>}><Route index
+                                                                               element={<AdminDashboardPage/>}/><Route
+        path="users" element={<AdminUsersPage/>}/><Route path="sellers" element={<AdminSellerApplicationsPage/>}/><Route
+        path="products" element={<AdminProductsPage/>}/><Route path="marketplace" element={
+        <AdminMarketplacePage/>}/></Route></Routes></BrowserRouter>
+};
+export default App;

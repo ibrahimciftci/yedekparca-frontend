@@ -1,107 +1,34 @@
-import {useEffect, useState} from "react";
+import {useEffect, useState, useSyncExternalStore} from "react";
 import {Link, useParams} from "react-router-dom";
-import {Heart, Phone, MapPin, MessageCircle, Flag} from "lucide-react";
-import marketplaceService, {type CatalogView} from "../services/marketplaceService";
+import {ArrowLeft, ChevronLeft, ChevronRight, Heart, MapPin, MessageCircle, Navigation, Phone, X} from "lucide-react";
+import marketplaceService, {type CatalogView, type OfferView} from "../services/marketplaceService";
+import ProductImage from "../components/ProductImage";
+import DemoPhotoNotice from "../components/DemoPhotoNotice";
+import {resolveApiAssetUrl} from "../services/api";
+import {getFavoriteIds, loadFavorites, subscribeFavorites, toggleFavorite} from "../services/favoriteStore";
 
-const ageDays = (s: string) => Math.floor((Date.now() - new Date(s).getTime()) / 86400000);
-
-function CatalogDetailPage() {
-    const {id} = useParams();
-    const [item, setItem] = useState<CatalogView | null>(null);
-    const [condition, setCondition] = useState("NEW");
-    const [error, setError] = useState("");
-    useEffect(() => {
-        if (id) marketplaceService.detail(Number(id)).then(setItem).catch(() => setError("Ürün bulunamadı veya yayında değil."));
-    }, [id]);
-    if (error) return <main className="p-10 text-center text-red-600">{error}</main>;
-    if (!item) return <main className="p-10">Ürün yükleniyor…</main>;
-    const offers = item.offers.filter(o => o.condition === condition).sort((a, b) => a.price - b.price);
-    return <main className="min-h-screen bg-slate-50">
-        <header className="bg-[#101d35] p-5 text-white">
-            <div className="mx-auto max-w-6xl"><Link to="/products">← Ürünlere dön</Link></div>
-        </header>
-        <div className="mx-auto max-w-6xl px-4 py-8"><p
-            className="text-sm font-semibold text-orange-600">{item.brand} · {item.category} {item.oemNumber && `· OEM ${item.oemNumber}`}</p>
-            <div className="flex flex-wrap items-center justify-between gap-4"><h1
-                className="text-3xl font-bold text-[#101d35]">{item.name}</h1>
-                <button onClick={() => marketplaceService.favorite(item.id).catch(() => location.assign("/login"))}
-                        className="flex items-center gap-2 rounded-lg border bg-white px-4 py-2 text-rose-600"><Heart
-                    size={18}/> Favori
-                </button>
-            </div>
-            {item.description && <p className="mt-3 max-w-3xl text-slate-600">{item.description}</p>}
-            <div className="mt-8 flex gap-2">
-                <button onClick={() => setCondition("NEW")}
-                        className={`rounded-full px-5 py-2 ${condition === "NEW" ? "bg-orange-500 text-white" : "bg-white"}`}>Sıfır
-                </button>
-                <button onClick={() => setCondition("USED")}
-                        className={`rounded-full px-5 py-2 ${condition === "USED" ? "bg-orange-500 text-white" : "bg-white"}`}>İkinci
-                    el
-                </button>
-            </div>
-            <div className="mt-5 space-y-4">{offers.length === 0 ?
-                <p className="rounded-xl bg-white p-8">Bu durumda yayında firma ilanı yok.</p> : offers.map(o => {
-                    const stale = ageDays(o.priceUpdatedAt) > 30 || ageDays(o.stockUpdatedAt) > 30;
-                    const phone = o.sellerPhone.replace(/[^+0-9]/g, "");
-                    const waNumber = (o.whatsappPhone || o.sellerPhone).replace(/[^0-9]/g, "");
-                    const destination = o.latitude && o.longitude ? `${o.latitude},${o.longitude}` : encodeURIComponent(`${o.streetAddress || ""} ${o.city} ${o.district}`);
-                    const wa = `https://wa.me/${waNumber}?text=${encodeURIComponent(`Merhaba, ${item.name} ürününüz hakkında bilgi almak istiyorum.`)}`;
-                    return <article key={o.id} className="rounded-2xl border bg-white p-5 shadow-sm">
-                        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-                            <div className="flex gap-4"><div className="flex gap-2">{o.photos.map(photo => photo.url &&
-                                <img key={photo.id} src={photo.url} alt={item.name}
-                                     className="h-20 w-20 rounded-xl object-cover"/>)}{!o.photos.length && o.legacyImageUrl &&
-                                <img src={o.legacyImageUrl} alt={item.name}
-                                     className="h-20 w-20 rounded-xl object-cover"/>}</div>
-                            <div>{o.sellerLogo && <img src={o.sellerLogo} alt="Firma logosu"
-                                                       className="mb-2 h-10 w-10 rounded-full object-cover"/>}<Link
-                                to={`/sellers/${o.sellerId}`}
-                                className="text-lg font-bold text-[#101d35]">{o.sellerName}</Link><p
-                                className="mt-1 flex items-center gap-1 text-sm text-slate-500"><MapPin
-                                size={15}/>{o.city}, {o.district}</p>{o.offerDescription &&
-                                <p className="mt-1 text-sm text-slate-600">{o.offerDescription}</p>}<p
-                                className="mt-1 text-sm">Stok: {o.stockQuantity > 0 ? `${o.stockQuantity} adet (firma beyanı)` : "Tükendi"}</p>
-                                <p className="mt-1 text-xs text-slate-500">Fiyat
-                                    güncelleme: {new Date(o.priceUpdatedAt).toLocaleDateString("tr-TR")} · stok
-                                    güncelleme: {new Date(o.stockUpdatedAt).toLocaleDateString("tr-TR")}{stale && <span
-                                        className="ml-2 text-amber-700">Fiyat veya stok bilgisi eski olabilir.</span>}</p>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2"><strong
-                            className="mr-2 text-2xl">{o.price.toLocaleString("tr-TR")} ₺</strong><a
-                            href={`tel:${phone}`} className="rounded-lg bg-emerald-600 p-3 text-white"
-                            title="Ara"><Phone size={18}/></a><a href={wa} target="_blank" rel="noreferrer"
-                                                                 className="rounded-lg bg-green-600 p-3 text-white"
-                                                                 title="WhatsApp"><MessageCircle size={18}/></a><Link
-                            to={`/sellers/${o.sellerId}`} className="rounded-lg border px-4 py-3 text-sm">Firma
-                            profili</Link><a href={`https://www.google.com/maps/dir/?api=1&destination=${destination}`}
-                                             target="_blank" rel="noreferrer"
-                                             className="rounded-lg border px-3 py-3 text-sm">Google Maps</a><a
-                            href={`https://maps.apple.com/?daddr=${destination}&dirflg=d`} target="_blank"
-                            rel="noreferrer" className="rounded-lg border px-3 py-3 text-sm">Apple Maps</a><a
-                            href={`https://yandex.com/maps/?rtext=~${destination}&rtt=auto`} target="_blank"
-                            rel="noreferrer" className="rounded-lg border px-3 py-3 text-sm">Yandex</a>
-                            <button onClick={async () => {
-                                const category = prompt("Şikâyet kategorisi (WRONG_PRICE, WRONG_PRODUCT_INFO, WRONG_STOCK, UNREACHABLE_SELLER, MISLEADING_PHOTO, OTHER)");
-                                const description = prompt("Şikâyet açıklaması");
-                                if (category && description) try {
-                                    await marketplaceService.complain({
-                                        sellerId: o.sellerId,
-                                        offerId: o.id,
-                                        category,
-                                        description
-                                    });
-                                    alert("Şikâyet gönderildi.")
-                                } catch {
-                                    alert("Şikâyet için giriş yapın veya daha sonra tekrar deneyin.")
-                                }
-                            }} className="rounded-lg border p-3" title="Şikâyet et"><Flag size={18}/></button>
-                        </div>
-                    </div>
-                </article>
-                })}</div>
-        </div>
-    </main>
+const categories = [{value:"WRONG_PRICE",label:"Hatalı fiyat bilgisi"},{value:"WRONG_PRODUCT_INFO",label:"Yanlış ürün bilgisi"},{value:"WRONG_STOCK",label:"Güncel olmayan stok bilgisi"},{value:"UNREACHABLE_SELLER",label:"Satıcıya ulaşılamıyor"},{value:"MISLEADING_PHOTO",label:"Yanıltıcı ürün fotoğrafı"},{value:"OTHER",label:"Diğer"}];
+const photosOf=(offer:OfferView)=>Array.from(new Set([...offer.photos].sort((a,b)=>Number(b.primaryPhoto)-Number(a.primaryPhoto)||a.displayOrder-b.displayOrder).map(photo=>photo.url).filter((url):url is string=>Boolean(url)).concat(offer.legacyImageUrl?[offer.legacyImageUrl]:[])));
+function OfferGallery({offer,name}:{offer:OfferView;name:string}) {
+ const photos=photosOf(offer),[active,setActive]=useState(0),[lightbox,setLightbox]=useState(false);
+ const move=(delta:number)=>setActive(index=>(index+delta+photos.length)%photos.length);
+ useEffect(()=>{if(!lightbox)return;const key=(event:KeyboardEvent)=>{if(event.key==="Escape")setLightbox(false);if(event.key==="ArrowRight")move(1);if(event.key==="ArrowLeft")move(-1)};window.addEventListener("keydown",key);return()=>window.removeEventListener("keydown",key)},[lightbox,photos.length]);
+ return <><div className="w-full md:w-52"><button onClick={()=>photos.length&&setLightbox(true)} className="h-44 w-full overflow-hidden rounded-xl bg-slate-100 md:h-36"><ProductImage src={photos[active]} alt={`${name} — ${offer.sellerName}`} className="h-full w-full"/></button>{photos.length>1&&<div className="mt-2 flex gap-2 overflow-x-auto">{photos.map((src,i)=><button key={`${src}-${i}`} onClick={()=>setActive(i)} className={`h-12 w-12 shrink-0 overflow-hidden rounded-lg border-2 ${i===active?"border-orange-500":"border-transparent"}`}><img src={resolveApiAssetUrl(src)} alt={`${name} fotoğraf ${i+1}`} className="h-full w-full object-cover"/></button>)}</div>}</div>{lightbox&&<div role="dialog" aria-modal="true" aria-label={`${name} fotoğraf galerisi`} onClick={()=>setLightbox(false)} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4"><button aria-label="Kapat" className="absolute right-5 top-5 text-white"><X/></button>{photos.length>1&&<button aria-label="Önceki fotoğraf" onClick={e=>{e.stopPropagation();move(-1)}} className="absolute left-4 rounded-full bg-white p-3"><ChevronLeft/></button>}<img src={resolveApiAssetUrl(photos[active])} alt={`${name} — ${offer.sellerName}`} onClick={e=>e.stopPropagation()} className="max-h-[85vh] max-w-[90vw] object-contain"/>{photos.length>1&&<button aria-label="Sonraki fotoğraf" onClick={e=>{e.stopPropagation();move(1)}} className="absolute right-4 rounded-full bg-white p-3"><ChevronRight/></button>}</div>}</>
 }
-
+function CatalogDetailPage(){
+ const{id}=useParams();const[item,setItem]=useState<CatalogView|null>(null);const[condition,setCondition]=useState("NEW");const[error,setError]=useState("");const[complaint,setComplaint]=useState<OfferView|null>(null);const[category,setCategory]=useState("WRONG_PRICE");const[description,setDescription]=useState("");const[sending,setSending]=useState(false);const[notice,setNotice]=useState("");const[routeOffer,setRouteOffer]=useState<OfferView|null>(null);const favoriteIds=useSyncExternalStore(subscribeFavorites,getFavoriteIds,getFavoriteIds);
+ useEffect(()=>{if(id)marketplaceService.detail(Number(id)).then(setItem).catch(()=>setError("Ürün bulunamadı veya yayında değil."));void loadFavorites().catch(()=>{})},[id]);
+ useEffect(()=>{if(!complaint)return;const close=(event:KeyboardEvent)=>{if(event.key==="Escape")setComplaint(null)};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close)},[complaint]);
+ if(error)return <main className="mx-auto max-w-5xl p-10 text-center text-red-600">{error}</main>;if(!item)return <main className="mx-auto max-w-5xl p-10">Ürün yükleniyor…</main>;
+ const offers=item.offers.filter(offer=>offer.condition===condition).sort((a,b)=>a.price-b.price);
+ const submitComplaint=async(event:React.FormEvent)=>{event.preventDefault();if(!localStorage.getItem("token")){setComplaint(null);setNotice("İlanı bildirmek için önce giriş yapmanız gerekiyor.");return}setSending(true);try{await marketplaceService.complain({sellerId:complaint!.sellerId,offerId:complaint!.id,category,description});setComplaint(null);setDescription("");setNotice("Bildiriminiz alındı. Teşekkür ederiz.")}catch{setNotice("Bildirim gönderilemedi. Bilgilerinizi kontrol edip tekrar deneyin.")}finally{setSending(false)}};
+ const destination=(offer:OfferView)=>{if(offer.latitude==null||offer.longitude==null)return null;return `${offer.latitude},${offer.longitude}`};
+ return <main className="mx-auto min-h-screen max-w-6xl px-4 py-7 text-[#101d35] md:px-6"><Link to="/products" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600"><ArrowLeft size={17}/> Ürünlere dön</Link><nav aria-label="Breadcrumb" className="my-5 text-sm text-slate-500"><Link to="/">Ana Sayfa</Link> / <Link to="/products">Ürünler</Link> / <span className="text-[#101d35]">{item.name}</span></nav><DemoPhotoNotice urls={item.offers.flatMap(photosOf)}/>
+ <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-7"><p className="mb-2 text-sm font-bold text-orange-600">{item.brand} · {item.category}{item.oemNumber&&` · OEM ${item.oemNumber}`}</p><div className="flex flex-wrap items-start justify-between gap-4"><h1 className="text-3xl font-extrabold tracking-tight md:text-4xl">{item.name}</h1><button onClick={()=>void toggleFavorite(item.id).then(added=>setNotice(added?"Ürün favorilerinize eklendi.":"Ürün favorilerinizden çıkarıldı.")).catch(()=>setNotice(localStorage.getItem("token")?"Favori işlemi tamamlanamadı.":"Favorilere eklemek için giriş yapın."))} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-rose-600"><Heart fill={favoriteIds.has(item.id)?"currentColor":"none"} size={19}/>{favoriteIds.has(item.id)?"Favorilerimde":"Favoriye ekle"}</button></div>{item.description&&<p className="mt-4 max-w-4xl leading-7 text-slate-600">{item.description}</p>}<div className="mt-6 grid gap-3 sm:grid-cols-3"><Info label="Marka" value={item.brand}/><Info label="Kategori" value={item.category}/><Info label="OEM numarası" value={item.oemNumber||"Belirtilmemiş"}/></div>{item.vehicleCompatibilities.length>0&&<div className="mt-5 rounded-xl bg-slate-50 p-4"><h2 className="font-bold">Uyumlu araçlar</h2><div className="mt-3 flex flex-wrap gap-2">{item.vehicleCompatibilities.map((v,i)=><span key={v.id??i} className="rounded-full bg-white px-3 py-2 text-sm text-slate-700">{v.vehicleBrand} {v.vehicleModel} · {v.yearFrom}–{v.yearTo}{v.engineInfo?` · ${v.engineInfo}`:""}</span>)}</div></div>}</section>
+ <section className="mt-8"><div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-sm font-bold uppercase tracking-wide text-orange-600">Satıcı teklifleri</p><h2 className="mt-1 text-2xl font-extrabold">Fiyatları karşılaştır</h2></div><div className="flex rounded-xl bg-slate-100 p-1">{[["NEW","Sıfır"],["USED","İkinci el"]].map(([value,label])=><button key={value} onClick={()=>setCondition(value)} className={`rounded-lg px-4 py-2 text-sm font-bold ${condition===value?"bg-[#101d35] text-white":"text-slate-600"}`}>{label}</button>)}</div></div>{notice&&<p role="status" className="mt-4 rounded-xl bg-orange-50 p-3 text-sm">{notice}</p>}<div className="mt-4 space-y-4">{offers.length===0?<p className="rounded-xl border bg-white p-8 text-slate-600">Bu durumda yayında firma ilanı yok.</p>:offers.map((o,index)=>{const phone=o.sellerPhone.replace(/[^+0-9]/g,"");const waNumber=(o.whatsappPhone||o.sellerPhone).replace(/[^0-9]/g,"");const wa=`https://wa.me/${waNumber}?text=${encodeURIComponent(`Merhaba, ${item.name} ürününüz hakkında bilgi almak istiyorum.`)}`;return <article key={o.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5"><div className="flex flex-col gap-5 md:flex-row"><OfferGallery offer={o} name={item.name}/><div className="min-w-0 flex-1">{index===0&&<span className="inline-block rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-800">En düşük fiyat</span>}<div className="mt-2 flex items-center gap-3">{o.sellerLogo&&<img src={o.sellerLogo} alt="Firma logosu" className="h-10 w-10 rounded-full object-cover"/>}<div><Link to={`/sellers/${o.sellerId}`} className="text-lg font-extrabold hover:text-orange-600">{o.sellerName}</Link><p className="flex items-center gap-1 text-sm text-slate-500"><MapPin size={14}/>{o.city}, {o.district}</p></div></div>{o.offerDescription&&<p className="mt-3 text-sm text-slate-600">{o.offerDescription}</p>}<div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm"><span>Durum: <b>{o.condition==="NEW"?"Sıfır":"İkinci el"}</b></span><span>Stok: <b>{o.stockQuantity>0?`${o.stockQuantity} adet (firma beyanı)`:"Tükendi"}</b></span><span>Fiyat: {new Date(o.priceUpdatedAt).toLocaleDateString("tr-TR")}</span></div><div className="mt-5 flex flex-wrap items-center gap-2"><strong className="mr-auto text-2xl">{o.price.toLocaleString("tr-TR")} ₺</strong><a href={`tel:${phone}`} aria-label="Satıcıyı ara" className="rounded-lg bg-emerald-600 p-3 text-white"><Phone size={18}/></a><a href={wa} target="_blank" rel="noreferrer" aria-label="WhatsApp ile yaz" className="rounded-lg bg-green-600 p-3 text-white"><MessageCircle size={18}/></a><Link to={`/sellers/${o.sellerId}`} className="rounded-lg border px-3 py-2 text-sm font-semibold">Firma profili</Link><button onClick={()=>setRouteOffer(o)} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold"><Navigation size={17}/>Yol Tarifi Al</button><button onClick={()=>{setComplaint(o);setNotice("")}} aria-label="İlanı bildir" className="rounded-lg border p-3 text-slate-600"><span aria-hidden="true">⚑</span></button></div></div></div></article>})}</div></section>
+ {routeOffer&&<div className="fixed inset-0 z-40 flex items-end justify-center bg-slate-950/40 p-4 md:items-center" onClick={()=>setRouteOffer(null)}><section role="dialog" aria-modal="true" aria-labelledby="route-title" onClick={e=>e.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl"><div className="flex justify-between"><h2 id="route-title" className="text-lg font-bold">Navigasyon uygulaması seçin</h2><button aria-label="Kapat" onClick={()=>setRouteOffer(null)}><X/></button></div>{destination(routeOffer)?<div className="mt-4 grid gap-2">{[["Google Maps",`https://www.google.com/maps/dir/?api=1&destination=${destination(routeOffer)}`],["Apple Maps",`https://maps.apple.com/?daddr=${destination(routeOffer)}&dirflg=d`],["Yandex Maps",`https://yandex.com/maps/?rtext=~${destination(routeOffer)}&rtt=auto`]].map(([label,url])=><a key={label} href={url} target="_blank" rel="noreferrer" onClick={()=>setRouteOffer(null)} className="rounded-xl border px-4 py-3 font-semibold hover:border-orange-400">{label}</a>)}</div>:<p className="mt-4 text-sm text-slate-600">Bu satıcının harita koordinatları bulunmuyor; yanlış bir rota oluşturmamak için yol tarifi verilemiyor.</p>}</section></div>}
+ {complaint&&<div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 md:items-center md:p-4" onClick={()=>!sending&&setComplaint(null)}><section role="dialog" aria-modal="true" aria-labelledby="complaint-title" onClick={e=>e.stopPropagation()} className="w-full max-w-lg rounded-t-2xl bg-white p-6 shadow-2xl md:rounded-2xl"><div className="flex items-start justify-between"><div><h2 id="complaint-title" className="text-xl font-extrabold">İlanı Bildir</h2><p className="mt-1 text-sm text-slate-500">Bu ilanla ilgili karşılaştığınız sorunu bize bildirin.</p></div><button disabled={sending} aria-label="Kapat" onClick={()=>setComplaint(null)}><X/></button></div>{!localStorage.getItem("token")&&<p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Bildirim göndermek için önce giriş yapmanız gerekiyor.</p>}<form onSubmit={submitComplaint} className="mt-5 space-y-4"><label className="block text-sm font-semibold">Sorun kategorisi<select value={category} onChange={e=>setCategory(e.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 p-3">{categories.map(c=><option key={c.value} value={c.value}>{c.label}</option>)}</select></label><label className="block text-sm font-semibold">Açıklama<textarea required maxLength={2000} rows={4} value={description} onChange={e=>setDescription(e.target.value)} className="mt-1 w-full resize-y rounded-lg border border-slate-300 p-3" placeholder="Karşılaştığınız durumu açıklayın…"/></label><div className="flex justify-end gap-2"><button type="button" disabled={sending} onClick={()=>setComplaint(null)} className="rounded-lg border px-4 py-2 font-semibold">Vazgeç</button><button disabled={sending||!description.trim()||!localStorage.getItem("token")} className="rounded-lg bg-orange-500 px-4 py-2 font-bold text-white disabled:opacity-50">{sending?"Gönderiliyor…":"Bildirimi Gönder"}</button></div></form></section></div>}
+ </main>
+}
+function Info({label,value}:{label:string;value:string}){return <div className="rounded-xl bg-slate-50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 font-bold">{value}</p></div>}
 export default CatalogDetailPage;

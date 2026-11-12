@@ -3,11 +3,19 @@ import { Link, useSearchParams } from "react-router-dom";
 import { CarFront, ChevronDown, ChevronUp, CircleDollarSign, Heart, Package, Search, SlidersHorizontal, Tag, X } from "lucide-react";
 import marketplaceService, { type CatalogView, type OfferView } from "../services/marketplaceService";
 import ProductImage from "../components/ProductImage";
+import DemoPhotoNotice, { isDemoImageUrl } from "../components/DemoPhotoNotice";
+import { useSyncExternalStore } from "react";
+import { getFavoriteIds, loadFavorites, subscribeFavorites, toggleFavorite } from "../services/favoriteStore";
 import PageHeading from "../components/PageHeading";
 import vehicleService, { type VehicleBrand, type VehicleModel, type VehicleType } from "../services/vehicleService";
 import type { ProductPageResponse } from "../types/api";
 
 const input = "ph-catalog-control";
+const pageParam = (value: string | null) => {
+    if (value === null || value.trim() === "") return 0;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : 0;
+};
 const photoUrls = (offers: OfferView[]) => Array.from(new Set(offers.flatMap(offer =>
     [...offer.photos].sort((a, b) => Number(b.primaryPhoto) - Number(a.primaryPhoto) || a.displayOrder - b.displayOrder)
         .map(photo => photo.url).concat(offer.legacyImageUrl)).filter((url): url is string => Boolean(url))));
@@ -35,6 +43,8 @@ function MarketplaceCatalogPage() {
     const [taxonomyError, setTaxonomyError] = useState("");
     const [taxonomyRetry, setTaxonomyRetry] = useState(0);
     const [catalogRetry, setCatalogRetry] = useState(0);
+    const [favoriteMessage, setFavoriteMessage] = useState("");
+    const favoriteIds = useSyncExternalStore(subscribeFavorites, getFavoriteIds, getFavoriteIds);
     const [advancedOpen, setAdvancedOpen] = useState(false);
     const [vehicle, setVehicle] = useState({ typeId: "", brandId: "", modelId: "" });
     const typeId = params.get("vehicleTypeId") || "";
@@ -90,12 +100,13 @@ function MarketplaceCatalogPage() {
         setError("");
         const filters: Record<string, string> = {};
         params.forEach((value, key) => { if (key !== "page") filters[key] = value; });
-        marketplaceService.catalog(filters, Number(params.get("page") || 0))
+        marketplaceService.catalog(filters, pageParam(params.get("page")))
             .then(page => { if (mounted) setResult(page); })
             .catch(() => { if (mounted) setError("Ürünler yüklenemedi. Bağlantınızı kontrol edip yeniden deneyin."); })
             .finally(() => { if (mounted) setLoading(false); });
         return () => { mounted = false; };
     }, [params, catalogRetry]);
+    useEffect(() => { void loadFavorites().catch(() => {}); }, []);
 
     const activeFilters: [string, string][] = [];
     params.forEach((value, key) => { if (key !== "page") activeFilters.push([key, value]); });
@@ -110,6 +121,7 @@ function MarketplaceCatalogPage() {
         condition: { NEW: "Sıfır", USED: "İkinci el" },
     };
     const displayFilter = (key: string, value: string) => `${FILTER_LABELS[key] || key}: ${optionLabels[key]?.[value] || value}`;
+    const demoPhotoUrls = result?.content.flatMap(product => photoUrls(product.offers)).filter(isDemoImageUrl) ?? [];
 
     const submit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -135,13 +147,15 @@ function MarketplaceCatalogPage() {
     const clearFilters = () => setParams(new URLSearchParams());
     const changePage = (nextPage: number) => setParams(current => {
         const next = new URLSearchParams(current);
-        if (nextPage <= 0) next.delete("page"); else next.set("page", String(nextPage));
+        const safeNextPage = Number.isFinite(nextPage) ? Math.max(0, Math.floor(nextPage)) : 0;
+        if (safeNextPage <= 0) next.delete("page"); else next.set("page", String(safeNextPage));
         return next;
     });
 
     return <main className="ph-catalog-page">
         <section className="ph-page-shell">
             <PageHeading icon={Package} title="Ürünler" description="Yedek parça, aksesuar ve otomotiv ürünlerini keşfedin." />
+            <DemoPhotoNotice urls={demoPhotoUrls} />
 
             <form key={params.toString()} onSubmit={submit} className="ph-catalog-filter-panel">
                 <div className="ph-catalog-main-filters">
@@ -176,22 +190,23 @@ function MarketplaceCatalogPage() {
                 </div>
                 {!loading && !error && result && <strong className="ph-result-count">{result.totalElements} ürün bulundu</strong>}
             </div>
+            {favoriteMessage && <p role="status" className="mb-3 rounded-lg bg-orange-50 p-3 text-sm text-[#101d35]">{favoriteMessage}</p>}
 
             {loading ? <p role="status" className="ph-state-message">Ürünler yükleniyor…</p> : error ? <div role="alert" className="ph-catalog-error"><p>{error}</p><button onClick={() => setCatalogRetry(value => value + 1)}>Yeniden dene</button></div> : !result?.content.length ?
                 <div className="ph-empty-state"><Package size={31} /><p>Eşleşen ürün bulunamadı.</p>{activeFilters.length > 0 && <button className="ph-filter-reset" onClick={clearFilters}>Filtreleri temizle</button>}</div> : <>
                     <div className="ph-catalog-grid">{result.content.map(product => {
                         const photos = photoUrls(product.offers);
-                        return <article key={product.id} className="ph-catalog-card">
-                            <div className="ph-catalog-card-image"><ProductImage src={photos[0]} fallbackSrcs={photos.slice(1)} alt={product.name} className="h-full w-full" /><button aria-label="Favoriye ekle" onClick={() => marketplaceService.favorite(product.id).catch(() => location.assign("/login"))} className="ph-favorite-button"><Heart size={19} /></button></div>
+                        return <article key={product.id} className="ph-catalog-card" role="link" tabIndex={0} aria-label={`${product.name} ürün detayını aç`} onClick={() => location.assign(`/catalog/${product.id}`)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); location.assign(`/catalog/${product.id}`); } }}>
+                            <div className="ph-catalog-card-image"><ProductImage src={photos[0]} fallbackSrcs={photos.slice(1)} alt={product.name} className="h-full w-full" /><button aria-label={favoriteIds.has(product.id) ? "Favorilerden çıkar" : "Favoriye ekle"} onClick={event => { event.stopPropagation(); void toggleFavorite(product.id).then(added => setFavoriteMessage(added ? "Ürün favorilerinize eklendi." : "Ürün favorilerinizden çıkarıldı.")).catch(() => setFavoriteMessage(localStorage.getItem("token") ? "Favori işlemi tamamlanamadı. Lütfen tekrar deneyin." : "Favorilere eklemek için giriş yapın.")); }} className="ph-favorite-button"><Heart size={19} fill={favoriteIds.has(product.id) ? "currentColor" : "none"} /></button></div>
                             <div className="ph-catalog-card-body"><p className="ph-catalog-eyebrow">{product.brand} <span>·</span> {product.category}</p><h2>{product.name}</h2>
                                 {product.oemNumber && <p className="ph-catalog-oem">OEM: {product.oemNumber}</p>}
                                 <div className="ph-catalog-card-meta"><span>{product.offers.length} satıcı</span><span>{product.offers.some(offer => offer.condition === "USED") && !product.offers.some(offer => offer.condition === "NEW") ? "İkinci el" : "Yeni / ikinci el"}</span></div>
                                 <div className="ph-catalog-price"><CircleDollarSign size={19} /><strong>{product.offers.length ? `${Math.min(...product.offers.map(offer => offer.price)).toLocaleString("tr-TR")} ₺` : "Teklif yok"}</strong><small>başlayan fiyat</small></div>
-                                <Link to={`/catalog/${product.id}`} className="ph-catalog-detail-link">Fiyatları karşılaştır <ArrowRightIcon /></Link>
+                                <Link to={`/catalog/${product.id}`} onClick={event => event.stopPropagation()} className="ph-catalog-detail-link">Fiyatları karşılaştır <ArrowRightIcon /></Link>
                             </div>
                         </article>;
                     })}</div>
-                    {result.totalPages > 1 && <div className="ph-pagination"><button disabled={result.page <= 0} onClick={() => changePage(result.page - 1)}>Önceki</button><span>Sayfa {result.page + 1} / {result.totalPages}</span><button disabled={result.last} onClick={() => changePage(result.page + 1)}>Sonraki</button></div>}
+                    {result.totalPages > 1 && <div className="ph-pagination"><button disabled={(result.page ?? 0) <= 0 || loading} onClick={() => changePage((result.page ?? 0) - 1)}>Önceki</button><span>Sayfa {(result.page ?? 0) + 1} / {result.totalPages}</span><button disabled={result.last || (result.page ?? 0) >= result.totalPages - 1 || loading} onClick={() => changePage((result.page ?? 0) + 1)}>Sonraki</button></div>}
                 </>}
         </section>
     </main>;

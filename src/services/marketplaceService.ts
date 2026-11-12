@@ -8,10 +8,12 @@ export interface SellerProfile {id:number;storeName:string;phone:string;whatsapp
 export interface AdminOfferFilters {search?:string;category?:string;brand?:string;sellerId?:number;status?:"PENDING"|"APPROVED"|"REJECTED";active?:boolean;page?:number;size?:number;}
 export interface PublicSeller {id:number;storeName:string;city:string;district:string;cityId:number|null;districtId:number|null;description:string|null;logoUrl:string|null;offerCount:number;}
 const data=<T,>(p:Promise<{data:ApiResponse<T>}>)=>p.then(r=>r.data.data);
+const safePage=(page:number)=>Number.isFinite(page)?Math.max(0,Math.floor(page)):0;
+const normalizePage=<T,>(page:ProductPageResponse<T>):ProductPageResponse<T>=>({...page,page:Number.isFinite(page.page)?page.page:Number.isFinite(page.number)?page.number:0});
 const marketplaceService={
  categories:()=>data(api.get<ApiResponse<string[]>>("/api/catalog/categories")),
  brands:()=>data(api.get<ApiResponse<string[]>>("/api/catalog/brands")),
- catalog:(filters:Record<string,string>,page=0,size=12)=>data(api.get<ApiResponse<ProductPageResponse<CatalogView>>>("/api/catalog/products",{params:{...filters,page,size}})),
+ catalog:(filters:Record<string,string>,page=0,size=12)=>api.get<ApiResponse<ProductPageResponse<CatalogView>>>("/api/catalog/products",{params:{...filters,page:safePage(page),size}}).then(r=>normalizePage(r.data.data)),
  detail:(id:number)=>data(api.get<ApiResponse<CatalogView>>(`/api/catalog/products/${id}`)),
  profile:(id:number)=>data(api.get<ApiResponse<SellerProfile>>(`/api/sellers/${id}/profile`)),
  publicSellers:(params:Record<string,string|number>)=>data(api.get<ApiResponse<ProductPageResponse<PublicSeller>>>("/api/sellers",{params})),
