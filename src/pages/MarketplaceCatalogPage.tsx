@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { CarFront, ChevronDown, ChevronUp, CircleDollarSign, Heart, Package, Search, SlidersHorizontal, Tag, X } from "lucide-react";
 import marketplaceService, { type CatalogView, type OfferView } from "../services/marketplaceService";
 import ProductImage from "../components/ProductImage";
@@ -28,6 +28,7 @@ const FILTER_LABELS: Record<string, string> = {
 };
 
 function MarketplaceCatalogPage() {
+    const navigate = useNavigate();
     const [params, setParams] = useSearchParams();
     const [result, setResult] = useState<ProductPageResponse<CatalogView> | null>(null);
     const [loading, setLoading] = useState(true);
@@ -196,7 +197,7 @@ function MarketplaceCatalogPage() {
                 <div className="ph-empty-state"><Package size={31} /><p>Eşleşen ürün bulunamadı.</p>{activeFilters.length > 0 && <button className="ph-filter-reset" onClick={clearFilters}>Filtreleri temizle</button>}</div> : <>
                     <div className="ph-catalog-grid">{result.content.map(product => {
                         const photos = photoUrls(product.offers);
-                        return <article key={product.id} className="ph-catalog-card" role="link" tabIndex={0} aria-label={`${product.name} ürün detayını aç`} onClick={() => location.assign(`/catalog/${product.id}`)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); location.assign(`/catalog/${product.id}`); } }}>
+                        return <article key={product.id} className="ph-catalog-card" role="link" tabIndex={0} aria-label={`${product.name} ürün detayını aç`} onClick={() => navigate(`/catalog/${product.id}`)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); navigate(`/catalog/${product.id}`); } }}>
                             <div className="ph-catalog-card-image"><ProductImage src={photos[0]} fallbackSrcs={photos.slice(1)} alt={product.name} className="h-full w-full" /><button aria-label={favoriteIds.has(product.id) ? "Favorilerden çıkar" : "Favoriye ekle"} onClick={event => { event.stopPropagation(); void toggleFavorite(product.id).then(added => setFavoriteMessage(added ? "Ürün favorilerinize eklendi." : "Ürün favorilerinizden çıkarıldı.")).catch(() => setFavoriteMessage(localStorage.getItem("token") ? "Favori işlemi tamamlanamadı. Lütfen tekrar deneyin." : "Favorilere eklemek için giriş yapın.")); }} className="ph-favorite-button"><Heart size={19} fill={favoriteIds.has(product.id) ? "currentColor" : "none"} /></button></div>
                             <div className="ph-catalog-card-body"><p className="ph-catalog-eyebrow">{product.brand} <span>·</span> {product.category}</p><h2>{product.name}</h2>
                                 {product.oemNumber && <p className="ph-catalog-oem">OEM: {product.oemNumber}</p>}
