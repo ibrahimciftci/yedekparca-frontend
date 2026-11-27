@@ -2,7 +2,7 @@ import {useEffect, useMemo, useState} from "react";
 import {Link, useParams} from "react-router-dom";
 import {MapPin, MessageCircle, Phone, Tag} from "lucide-react";
 import marketplaceService, {type OfferView} from "../services/marketplaceService";
-import ProductImage from "../components/ProductImage";
+import PhotoGallery from "../components/PhotoGallery";
 import DemoPhotoNotice from "../components/DemoPhotoNotice";
 
 function OfferDetailPage() {
@@ -40,8 +40,7 @@ function OfferDetailPage() {
         <DemoPhotoNotice urls={photos}/>
         <div className="mt-5 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
             <section>
-                <ProductImage src={photos[0]} fallbackSrcs={photos.slice(1)} alt={offer.name} className="h-[340px] w-full rounded-2xl bg-white sm:h-[460px]"/>
-                {photos.length>1&&<div className="mt-3 grid grid-cols-4 gap-3">{photos.slice(1).map((photo,index)=><img key={photo+"-"+index} src={photo} alt={offer.name+" fotoğraf "+(index+2)} className="h-24 w-full rounded-lg border object-cover"/>)}</div>}
+                <PhotoGallery photos={photos} alt={offer.name}/>
             </section>
             <section className="rounded-2xl border bg-white p-5 shadow-sm sm:p-7">
                 <p className="text-sm font-bold text-orange-700">{offer.category} · {offer.brand}</p>
