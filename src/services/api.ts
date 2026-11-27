@@ -19,7 +19,7 @@ export function resolveApiAssetUrl(source?: string | null): string | undefined {
 const isPublicGet = (method: string | undefined, rawUrl: string | undefined) => {
     if ((method || "get").toLowerCase() !== "get") return false;
     const path = String(rawUrl || "").split("?")[0].replace(/^https?:\/\/[^/]+/i, "");
-    return /^\/api\/(?:catalog\/products(?:\/[^/]+)?|marketplace\/catalog|catalog\/(?:categories|brands)|vehicles\/(?:types|brands(?:\/[^/]+\/models)?)|locations(?:\/.*)?|sellers(?:\/\d+\/(?:profile|offers))?|dev-demo\/images\/(?:parts\/)?[^/]+)$/.test(path);
+    return /^\/api\/(?:offers(?:\/\d+)?|catalog\/products(?:\/[^/]+)?|marketplace\/catalog|catalog\/(?:categories|brands)|vehicles\/(?:types|brands(?:\/[^/]+\/models)?)|locations(?:\/.*)?|sellers(?:\/\d+\/(?:profile|offers))?|dev-demo\/images\/(?:parts\/)?[^/]+)$/.test(path);
 };
 
 // Her istekte varsa JWT token'ını otomatik gönderir.

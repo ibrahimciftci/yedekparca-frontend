@@ -29,6 +29,7 @@ import SellerProductsPage from "./pages/SellerProductsPage";
 import SellerRoute from "./components/SellerRoute";
 import MarketplaceCatalogPage from "./pages/MarketplaceCatalogPage";
 import CatalogDetailPage from "./pages/CatalogDetailPage";
+import OfferDetailPage from "./pages/OfferDetailPage";
 import SellerProfilePage from "./pages/SellerProfilePage";
 import FavoritesPage from "./pages/FavoritesPage";
 import SellerMarketplacePage from "./pages/SellerMarketplacePage";
@@ -37,7 +38,7 @@ import PageHeading from "./components/PageHeading";
 import SellerApplyPage from "./pages/SellerApplyPage";
 import AdminMarketplacePage from "./pages/admin/AdminMarketplacePage";
 import userService from "./services/userService";
-import marketplaceService, {type CatalogView} from "./services/marketplaceService";
+import marketplaceService, {type OfferView} from "./services/marketplaceService";
 import vehicleService, {type VehicleBrand, type VehicleModel, type VehicleType} from "./services/vehicleService";
 import type {UserResponse} from "./types/api";
 
@@ -127,7 +128,7 @@ function PublicLayout() {
 
 function HomePage() {
     const navigate = useNavigate();
-    const [search, setSearch] = useState(''), [cats, setCats] = useState<string[]>([]), [brands, setBrands] = useState<string[]>([]), [types, setTypes] = useState<VehicleType[]>([]), [vehicleBrands, setVehicleBrands] = useState<VehicleBrand[]>([]), [models, setModels] = useState<VehicleModel[]>([]), [modelsLoading, setModelsLoading] = useState(false), [category, setCategory] = useState(''), [brand, setBrand] = useState(''), [type, setType] = useState(''), [vehicleBrand, setVehicleBrand] = useState(''), [model, setModel] = useState(''), [items, setItems] = useState<CatalogView[]>([]), [vehicleError, setVehicleError] = useState(""), [vehicleBrandsLoading, setVehicleBrandsLoading] = useState(true);
+    const [search, setSearch] = useState(''), [cats, setCats] = useState<string[]>([]), [brands, setBrands] = useState<string[]>([]), [types, setTypes] = useState<VehicleType[]>([]), [vehicleBrands, setVehicleBrands] = useState<VehicleBrand[]>([]), [models, setModels] = useState<VehicleModel[]>([]), [modelsLoading, setModelsLoading] = useState(false), [category, setCategory] = useState(''), [brand, setBrand] = useState(''), [type, setType] = useState(''), [vehicleBrand, setVehicleBrand] = useState(''), [model, setModel] = useState(''), [items, setItems] = useState<OfferView[]>([]), [vehicleError, setVehicleError] = useState(""), [vehicleBrandsLoading, setVehicleBrandsLoading] = useState(true);
     useEffect(() => {
         marketplaceService.categories().then(setCats).catch(() => {
         });
@@ -135,7 +136,7 @@ function HomePage() {
         });
         vehicleService.types().then(setTypes).catch(() => setVehicleError("Araç türleri yüklenemedi."));
         vehicleService.brands().then(setVehicleBrands).catch(() => setVehicleError("Araç markaları yüklenemedi.")).finally(() => setVehicleBrandsLoading(false));
-        marketplaceService.catalog({}, 0, 8).then(r => setItems(r.content)).catch(() => {
+        marketplaceService.offers({}, 0, 8).then(r => setItems(r.content)).catch(() => {
         })
     }, []);
     useEffect(() => {
@@ -222,16 +223,10 @@ function HomePage() {
             <div className="ph-section-heading">
                 <div><span className="ph-kicker">Özenle seçilmiş</span><h2>Öne Çıkan Ürünler</h2></div>
                 <Link to="/products">Tüm Ürünler <ArrowRight size={17}/></Link></div>
-            <div className="ph-product-grid">{items.slice(0, 8).map(p => {
-                const offer = p.offers?.find(o => o.active && o.moderationStatus === 'APPROVED');
-                return <Link to={'/catalog/' + p.id} className="ph-product" key={p.id}>
-                    <div className="ph-product-image">{offer?.photos?.[0]?.url ? <img src={offer.photos[0].url}/> :
-                        <Wrench/>}</div>
-                    <div className="ph-product-info">
-                        <small>{p.brand || p.category}</small><b>{p.name}</b><strong>{offer ? `${offer.price.toLocaleString('tr-TR')} ₺` : 'Satıcıları görüntüle'}</strong>{offer &&
-                        <small>{offer.sellerName}</small>}</div>
-                </Link>
-            })}</div>
+            <div className="ph-product-grid">{items.slice(0, 8).map(offer => <Link to={'/offers/' + offer.id} className="ph-product" key={offer.id}>
+                <div className="ph-product-image">{offer.photos?.[0]?.url ? <img src={offer.photos[0].url} alt={offer.name}/> : <Wrench/>}</div>
+                <div className="ph-product-info"><small>{offer.brand || offer.category}</small><b>{offer.name}</b><strong>{offer.price.toLocaleString('tr-TR')} ₺</strong><small>{offer.sellerName}</small></div>
+            </Link>)}</div>
         </section>
         <section className="ph-seller-call">
             <div><span className="ph-kicker">Güvenilir iş ortakları</span><h2>ParçaHan satıcılarıyla tanışın</h2>
@@ -276,7 +271,7 @@ function App() {
         path="/register" element={<RegisterPage/>}/><Route path="/profile" element={<ProfilePage/>}/><Route
         path="/products" element={<MarketplaceCatalogPage/>}/><Route path="/legacy-products"
                                                                      element={<ProductCatalogPage/>}/><Route
-        path="/catalog/:id" element={<CatalogDetailPage/>}/><Route path="/sellers/:id"
+        path="/catalog/:id" element={<CatalogDetailPage/>}/><Route path="/offers/:id" element={<OfferDetailPage/>}/><Route path="/sellers/:id"
                                                                    element={<SellerProfilePage/>}/><Route
         path="/favorites" element={<FavoritesPage/>}/><Route path="/seller/apply" element={<SellerApplyPage/>}/><Route
         path="/seller/marketplace" element={<SellerRoute><SellerMarketplacePage mode="profile"/></SellerRoute>}/><Route

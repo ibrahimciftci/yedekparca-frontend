@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState, type FormEvent} from "react";
 import {Pencil, Store} from "lucide-react";
 import axios from "axios";
-import marketplaceService, {type OfferView, type CatalogView, type SellerProfile} from "../services/marketplaceService";
+import marketplaceService, {type OfferView, type SellerProfile} from "../services/marketplaceService";
 import ProductImage from "../components/ProductImage";
 import VehiclePicker, {type VehicleSelection} from "../components/VehiclePicker";
 import LocationPicker, {emptyLocation, type LocationSelection} from "../components/LocationPicker";
@@ -9,7 +9,6 @@ import LocationPicker, {emptyLocation, type LocationSelection} from "../componen
 type CompatibilityForm = VehicleSelection & {yearFrom:string;yearTo:string;engineInfo:string;vehicleBrand:string;vehicleModel:string};
 
 type FormState = {
-    catalogProductId: string;
     name: string;
     description: string;
     offerDescription: string;
@@ -23,7 +22,7 @@ type FormState = {
 };
 
 const empty: FormState = {
-    catalogProductId: "", name: "", description: "", offerDescription: "", category: "", brand: "",
+    name: "", description: "", offerDescription: "", category: "", brand: "",
     oemNumber: "", price: "", stockQuantity: "0", condition: "NEW", vehicleCompatibilities: []
 };
 
@@ -54,8 +53,6 @@ function apiErrorMessage(error: unknown): string | null {
 function SellerMarketplacePage({ mode = "offers" }: { mode?: Tab }) {
     const tab = mode;
     const [offers, setOffers] = useState<OfferView[]>([]);
-    const [catalogMatches, setCatalogMatches] = useState<CatalogView[]>([]);
-    const [catalogSearch, setCatalogSearch] = useState("");
     const [categories, setCategories] = useState<string[]>([]);
     const [brands, setBrands] = useState<string[]>([]);
     const [profile, setProfile] = useState<SellerProfile | null>(null);
@@ -169,16 +166,8 @@ function SellerMarketplacePage({ mode = "offers" }: { mode?: Tab }) {
         }
         setBusy(true);
         try {
-            const detailsChanged = editingOffer && (
-                form.name !== editingOffer.name || form.category !== editingOffer.category ||
-                form.brand !== editingOffer.brand || form.oemNumber !== (editingOffer.oemNumber || "") ||
-                form.description !== (editingOffer.description || "")
-            );
             const payload = {
                 ...form,
-                catalogProductId: editingOffer
-                    ? (detailsChanged ? null : editingOffer.catalogProductId)
-                    : (form.catalogProductId ? Number(form.catalogProductId) : null),
                 price,
                 stockQuantity: stock,
                 vehicleCompatibilities: form.vehicleCompatibilities.map(item => ({
@@ -212,7 +201,6 @@ function SellerMarketplacePage({ mode = "offers" }: { mode?: Tab }) {
             }
             setForm(empty);
             setFiles([]);
-            setCatalogSearch("");
             setShowCreate(false);
             setEditingOffer(null);
             setMessage(photoUploadFailed
@@ -220,47 +208,22 @@ function SellerMarketplacePage({ mode = "offers" }: { mode?: Tab }) {
                 : editingOffer ? "İlan güncellendi." : "İlan incelemeye gönderildi.");
             await loadOffers();
         } catch {
-            setMessage("İlan kaydedilemedi. Katalog ürünü, kategori ve marka seçimlerini kontrol edin.");
+            setMessage("İlan kaydedilemedi. Kategori ve marka seçimlerini kontrol edin.");
         } finally {
             setBusy(false);
         }
     };
 
-    const searchCatalog = (value: string) => {
-        setCatalogSearch(value);
-        if (!value.trim()) {
-            setCatalogMatches([]);
-            return;
-        }
-        marketplaceService.sellerCatalog(value).then(setCatalogMatches).catch(() => setCatalogMatches([]));
-    };
-
-    const selectCatalog = (catalog: CatalogView) => {
-        setForm(current => ({
-            ...current,
-            catalogProductId: String(catalog.id),
-            name: catalog.name,
-            category: catalog.category,
-            brand: catalog.brand,
-            oemNumber: catalog.oemNumber || "",
-            description: catalog.description || "",
-            vehicleCompatibilities: toCompatibilityForm(catalog.vehicleCompatibilities)
-        }));
-        setCatalogSearch(catalog.name);
-        setCatalogMatches([]);
-    };
-
     const openEdit = (offer: OfferView) => {
         setEditingOffer(offer);
         setForm({
-            catalogProductId: String(offer.catalogProductId), name: offer.name,
+            name: offer.name,
             description: offer.description || "", offerDescription: offer.offerDescription || "",
             category: offer.category, brand: offer.brand, oemNumber: offer.oemNumber || "",
             price: String(offer.price), stockQuantity: String(offer.stockQuantity), condition: offer.condition,
             vehicleCompatibilities: toCompatibilityForm(offer.vehicleCompatibilities)
         });
         setFiles([]);
-        setCatalogSearch(offer.name);
         setShowCreate(true);
     };
 
@@ -299,7 +262,7 @@ function SellerMarketplacePage({ mode = "offers" }: { mode?: Tab }) {
             {tab === "offers" && <section role="tabpanel" className="mt-6 rounded-2xl border bg-white p-6">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <div><h2 className="text-xl font-bold">Ürün ilanlarım</h2><p className="mt-1 text-sm text-slate-500">İlanlarınızı ve moderasyon durumlarını yönetin.</p></div>
-                    <button type="button" onClick={() => { setEditingOffer(null); setForm(empty); setFiles([]); setCatalogSearch(""); setShowCreate(true); }}
+                    <button type="button" onClick={() => { setEditingOffer(null); setForm(empty); setFiles([]); setShowCreate(true); }}
                             className="rounded-lg bg-orange-500 px-5 py-3 font-semibold text-white hover:bg-orange-600">+ Yeni ürün ekle</button>
                 </div>
                 {loading ? <p className="mt-6 text-slate-500">İlanlar yükleniyor…</p> : offers.length === 0 ?
@@ -336,27 +299,20 @@ function SellerMarketplacePage({ mode = "offers" }: { mode?: Tab }) {
         }}>
             <section role="dialog" aria-modal="true" aria-labelledby="new-offer-title" className="mx-auto my-2 w-full max-w-3xl rounded-2xl bg-white p-5 shadow-2xl sm:my-4 sm:p-7">
                 <div className="flex items-start justify-between gap-4"><div><h2 id="new-offer-title" className="text-2xl font-bold">{editingOffer ? "Ürün ilanını düzenle" : "Yeni ürün ilanı"}</h2>
-                    <p className="mt-1 text-sm text-slate-500">{editingOffer ? "İlan bilgilerini güncelleyin." : "Mevcut kataloğu seçin veya yeni katalog ürünü önerin."}</p></div>
+                    <p className="mt-1 text-sm text-slate-500">{editingOffer ? "İlan bilgilerini güncelleyin." : "Katalog ürünü seçmeden bağımsız ilan oluşturun."}</p></div>
                     <button type="button" onClick={() => !busy && setShowCreate(false)} className="rounded-lg px-3 py-1 text-2xl text-slate-500" aria-label="Pencereyi kapat">×</button>
                 </div>
                 <form onSubmit={event => void createOffer(event)} className="mt-5 grid gap-4 sm:grid-cols-2">
-                    <label className="text-sm sm:col-span-2">Onaylı katalogda ürün ara
-                        <input value={catalogSearch} onChange={event => searchCatalog(event.target.value)} placeholder="Ürün adı, marka veya OEM"
-                               className="mt-1 w-full rounded-lg border px-3 py-2" />
-                        {!!catalogMatches.length && <div className="mt-2 max-h-40 overflow-auto rounded-lg border">{catalogMatches.map(catalog =>
-                            <button type="button" key={catalog.id} onClick={() => selectCatalog(catalog)} className="block w-full border-b px-3 py-2 text-left text-sm last:border-0 hover:bg-orange-50">
-                                {catalog.name} · {catalog.brand} · OEM {catalog.oemNumber || "—"}</button>)}</div>}
-                    </label>
-                    <label className="text-sm">Ürün adı<input required disabled={!!form.catalogProductId && !editingOffer} value={form.name} onChange={event => change("name", event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 disabled:bg-slate-100" /></label>
-                    <label className="text-sm">OEM / parça no<input disabled={!!form.catalogProductId && !editingOffer} value={form.oemNumber} onChange={event => change("oemNumber", event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 disabled:bg-slate-100" /></label>
-                    <label className="text-sm">Kategori<select required disabled={!!form.catalogProductId && !editingOffer} value={form.category} onChange={event => change("category", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 disabled:bg-slate-100">
+                    <label className="text-sm">Ürün adı<input required value={form.name} onChange={event => change("name", event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 disabled:bg-slate-100" /></label>
+                    <label className="text-sm">OEM / parça no<input value={form.oemNumber} onChange={event => change("oemNumber", event.target.value)} className="mt-1 w-full rounded-lg border px-3 py-2 disabled:bg-slate-100" /></label>
+                    <label className="text-sm">Kategori<select required value={form.category} onChange={event => change("category", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 disabled:bg-slate-100">
                         <option value="">Kategori seçin</option>{categories.map(category => <option key={category} value={category}>{category}</option>)}
                     </select></label>
-                    <label className="text-sm">Marka<select required disabled={!!form.catalogProductId && !editingOffer} value={form.brand} onChange={event => change("brand", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 disabled:bg-slate-100">
+                    <label className="text-sm">Marka<select required value={form.brand} onChange={event => change("brand", event.target.value)} className="mt-1 w-full rounded-lg border bg-white px-3 py-2 disabled:bg-slate-100">
                         <option value="">Marka seçin</option>{brands.map(brand => <option key={brand} value={brand}>{brand}</option>)}
                     </select></label>
                     <div className="sm:col-span-2 rounded-xl border border-slate-200 p-4">
-                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Araç uyumlulukları</h3><p className="mt-1 text-xs text-slate-500">Uyumluluk eklemek isteğe bağlıdır. Katalog uyumluluğu değişikliği yeniden moderasyona gönderilir.</p></div>
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Araç uyumlulukları</h3><p className="mt-1 text-xs text-slate-500">Uyumluluk eklemek isteğe bağlıdır. İlan uyumluluğu değişiklikleri yeniden moderasyona gönderilir.</p></div>
                             <button type="button" onClick={() => setForm(current => ({...current, vehicleCompatibilities: [...current.vehicleCompatibilities, {typeId:"",brandId:"",modelId:"",vehicleBrand:"",vehicleModel:"",yearFrom:"2000",yearTo:"2000",engineInfo:""}]}))} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50">+ Araç ekle</button>
                         </div>
                         {!form.vehicleCompatibilities.length && <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">Henüz araç uyumluluğu eklenmedi.</p>}

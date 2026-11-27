@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Search, X } from "lucide-react";
-import { Link } from "react-router-dom";
 import ProductImage from "../../components/ProductImage";
-import marketplaceService, { type CatalogView, type OfferView } from "../../services/marketplaceService";
+import marketplaceService, { type OfferView } from "../../services/marketplaceService";
 import type { ProductPageResponse } from "../../types/api";
 
 const statusLabels: Record<OfferView["moderationStatus"], string> = {
@@ -33,7 +32,6 @@ function AdminProductsPage() {
     const [moderationStatus, setModerationStatus] = useState("");
     const [active, setActive] = useState("");
     const [selected, setSelected] = useState<OfferView | null>(null);
-    const [catalog, setCatalog] = useState<CatalogView | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
     const [error, setError] = useState("");
@@ -64,7 +62,6 @@ function AdminProductsPage() {
 
     const closeDetails = () => {
         setSelected(null);
-        setCatalog(null);
     };
 
     const openDetails = async (id: number) => {
@@ -72,7 +69,6 @@ function AdminProductsPage() {
         try {
             const offer = await marketplaceService.adminOfferDetail(id);
             setSelected(offer);
-            setCatalog(await marketplaceService.adminCatalogDetail(offer.catalogProductId));
         } catch {
             setError("İlan detayları yüklenemedi.");
         }
@@ -126,10 +122,6 @@ function AdminProductsPage() {
     };
 
     return <section>
-        <Link to="/admin/marketplace" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-5 py-4 transition hover:border-orange-300 hover:bg-orange-100">
-            <span><strong className="text-[#101d35]">Ortak katalog yönetimi</strong><span className="ml-2 text-sm text-slate-600">Katalog ürünlerinin moderasyonu firma ilanlarından ayrı yürütülür.</span></span>
-            <span className="rounded-full bg-orange-500 px-3 py-1 text-sm font-semibold text-white">Katalog yönetimine git</span>
-        </Link>
         <div className="mb-8">
             <h1 className="text-2xl font-bold text-[#101d35]">Firma İlanları</h1>
             <p className="mt-2 text-slate-500">Satıcıların fiyat ve stok ilanlarını inceleyin, moderasyon ve yayın durumlarını yönetin.</p>
@@ -176,8 +168,8 @@ function AdminProductsPage() {
         {selected && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4"><div role="dialog" aria-modal="true" aria-labelledby="admin-offer-title" className="my-6 w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5"><div><h2 id="admin-offer-title" className="text-xl font-bold text-[#101d35]">Firma ilanı detayı</h2><p className="mt-1 text-sm text-slate-500">{selected.name} · {selected.sellerName}</p></div><button onClick={closeDetails} aria-label="Detayı kapat" className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X size={20} /></button></div>
             <div className="grid gap-5 px-6 py-6 sm:grid-cols-[180px_1fr]"><ProductImage src={sortedPhotos(selected)[0]} fallbackSrcs={sortedPhotos(selected).slice(1)} alt={selected.name} className="h-44 w-full rounded-xl sm:h-40" /><div className="grid gap-4 sm:grid-cols-2"><Detail label="Kategori / marka" value={`${selected.category} · ${selected.brand}`} /><Detail label="OEM / parça no" value={selected.oemNumber || "—"} /><Detail label="Fiyat / stok" value={`${selected.price.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })} · ${selected.stockQuantity} adet`} /><Detail label="Ürün durumu" value={selected.condition === "NEW" ? "Sıfır" : "İkinci el"} /><Detail label="Firma / konum" value={`${selected.sellerName} · ${selected.city}, ${selected.district}`} /><Detail label="Firma telefonu" value={selected.sellerPhone || "Belirtilmemiş"} /><Detail label="İlan durumu" value={`${statusLabels[selected.moderationStatus]} · ${selected.active ? "Aktif" : "Pasif"}`} />
-                {catalog && <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-semibold uppercase text-slate-500">Ortak katalog moderasyonu</p><p className="mt-1 text-sm text-slate-700">{catalog.moderationStatus === "APPROVED" ? "Onaylandı" : catalog.moderationStatus === "PENDING" ? "Onay bekliyor" : "Reddedildi"} · {catalog.active ? "Aktif" : "Pasif"}</p>{catalog.moderationStatus === "PENDING" && <p className="mt-2 text-xs text-slate-500">Bu ilanı onaylamak ortak katalog ürününü onaylamaz. Katalog kaydı ayrı olarak incelenir.</p>}</div>}
                 <div className="sm:col-span-2"><Detail label="Ürün açıklaması" value={selected.description || "Açıklama girilmemiş."} /></div><div className="sm:col-span-2"><Detail label="İlan açıklaması" value={selected.offerDescription || "Açıklama girilmemiş."} /></div>
+                <div className="sm:col-span-2"><p className="text-xs font-semibold uppercase text-slate-400">Araç uyumlulukları</p>{selected.vehicleCompatibilities.length ? <ul className="mt-1 space-y-1">{selected.vehicleCompatibilities.map(vehicle => <li key={vehicle.id} className="text-sm text-slate-700">{vehicle.vehicleBrand} {vehicle.vehicleModel} · {vehicle.yearFrom}–{vehicle.yearTo}{vehicle.engineInfo ? " · " + vehicle.engineInfo : ""}</li>)}</ul> : <p className="mt-1 text-sm text-slate-500">Uyumluluk bilgisi girilmemiş.</p>}</div>
                 {sortedPhotos(selected).length > 1 && <div className="flex flex-wrap gap-3 sm:col-span-2">{sortedPhotos(selected).slice(1).map(url => <ProductImage key={url} src={url} alt={selected.name} className="h-20 w-20 rounded-lg" />)}</div>}
                 {selected.rejectionReason && <div className="sm:col-span-2"><Detail label="Ret gerekçesi" value={selected.rejectionReason} /></div>}</div></div>
             {selected.moderationStatus === "PENDING" && <div className="flex flex-col-reverse gap-3 border-t border-slate-100 px-6 py-5 sm:flex-row sm:justify-end"><button onClick={() => void reviewOffer(selected, false)} disabled={actionLoading} className="rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50">Reddet</button><button onClick={() => void reviewOffer(selected, true)} disabled={actionLoading} className="rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50">{actionLoading ? "İşleniyor..." : "Onayla"}</button></div>}
